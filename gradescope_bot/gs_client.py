@@ -78,6 +78,23 @@ class GSClient:
         resp.raise_for_status()
         return parse_course_dashboard(resp.text)
 
+    def download_submission_pdf(
+        self, course_id: str, assignment_id: str, submission_id: str
+    ) -> bytes:
+        """Download a graded submission PDF. Raises if response isn't a PDF."""
+        url = (
+            f"{config.GS_BASE_URL}/courses/{course_id}/assignments/"
+            f"{assignment_id}/submissions/{submission_id}.pdf"
+        )
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        content = resp.content
+        if not content.startswith(b"%PDF"):
+            raise ValueError(
+                f"Response from {url} is not a PDF (first 16 bytes: {content[:16]!r})"
+            )
+        return content
+
     # ── Private ────────────────────────────────────────────────────────────
 
     def _install_rate_limit(self, session: requests.Session) -> None:
