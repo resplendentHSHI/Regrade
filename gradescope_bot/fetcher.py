@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable
 
-from gradescope_bot import storage
+from gradescope_bot import config, storage
 from gradescope_bot.gs_client import AssignmentRow, GSClient
 from gradescope_bot.rate_limit import DailyCapExhausted, RatePerRunExhausted
 
@@ -86,8 +86,17 @@ def run_fetch_phase(
             counters["errors"] += 1
             continue
 
+        cutoff = now - timedelta(days=config.BACKFILL_DAYS)
         for row in rows:
             if row.status != "graded" or row.submission_id is None:
+                continue
+            # Proxy for "recently graded": due_date within the backfill window.
+            # Assignments without a due_date (e.g., exams) are always included.
+            if row.due_date is not None and row.due_date < cutoff:
+                log.debug(
+                    "Skipping %s (%s): due %s before cutoff %s",
+                    row.assignment_id, row.name, row.due_date.isoformat(), cutoff.isoformat(),
+                )
                 continue
             item_id = _make_item_id(course_id, row.assignment_id)
             existing = storage.read_state(item_id)

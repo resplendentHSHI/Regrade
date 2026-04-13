@@ -40,7 +40,7 @@ def test_fetcher_creates_queue_folder_for_graded_assignment(tmp_data_dir: Path) 
                 name="Homework 1",
                 score=10.0,
                 max_score=10.0,
-                due_date=datetime(2026, 1, 19, 22, 0, 0),
+                due_date=datetime(2026, 4, 10, 22, 0, 0),  # within 7-day backfill window
                 status="graded",
             )
         ]
@@ -84,6 +84,50 @@ def test_fetcher_skips_ungraded_rows(tmp_data_dir: Path) -> None:
     fetcher.run_fetch_phase(client, now_local=lambda: datetime(2026, 4, 13, 2, 0, 0))
 
     assert storage.list_items() == []
+
+
+def test_fetcher_skips_assignments_older_than_backfill_window(tmp_data_dir: Path) -> None:
+    """Only items with due_date within the last BACKFILL_DAYS should be queued."""
+    courses = {"1222348": FakeCourse("1222348", "18-100: ECE", 2026, "Spring")}
+    old = AssignmentRow(
+        assignment_id="111", submission_id="s1", name="Old HW",
+        score=8.0, max_score=10.0,
+        due_date=datetime(2026, 1, 15, 0, 0, 0),  # ~3 months before now
+        status="graded",
+    )
+    fresh = AssignmentRow(
+        assignment_id="222", submission_id="s2", name="Fresh HW",
+        score=9.0, max_score=10.0,
+        due_date=datetime(2026, 4, 10, 0, 0, 0),  # 3 days before now
+        status="graded",
+    )
+    dashboards = {"1222348": [old, fresh]}
+    pdfs = {
+        ("1222348", "111", "s1"): b"%PDF-1.4\nold\n",
+        ("1222348", "222", "s2"): b"%PDF-1.4\nfresh\n",
+    }
+    client = _fake_client(courses, dashboards, pdfs)
+
+    fetcher.run_fetch_phase(client, now_local=lambda: datetime(2026, 4, 13, 2, 0, 0))
+
+    assert storage.read_state("1222348_111") is None, "Old assignment should be skipped"
+    assert storage.read_state("1222348_222") is not None, "Fresh assignment should be queued"
+
+
+def test_fetcher_includes_assignments_with_no_due_date(tmp_data_dir: Path) -> None:
+    """Exams/assignments without due_date are included regardless of backfill window."""
+    courses = {"1222348": FakeCourse("1222348", "18-100: ECE", 2026, "Spring")}
+    exam = AssignmentRow(
+        assignment_id="999", submission_id="sE", name="Midterm 1",
+        score=85.0, max_score=100.0, due_date=None, status="graded",
+    )
+    dashboards = {"1222348": [exam]}
+    pdfs = {("1222348", "999", "sE"): b"%PDF-1.4\nexam\n"}
+    client = _fake_client(courses, dashboards, pdfs)
+
+    fetcher.run_fetch_phase(client, now_local=lambda: datetime(2026, 4, 13, 2, 0, 0))
+
+    assert storage.read_state("1222348_999") is not None
 
 
 def test_fetcher_accepts_string_year_from_gradescopeapi_library(tmp_data_dir: Path) -> None:

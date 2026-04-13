@@ -47,6 +47,17 @@ CLAUDE_MAX_TURNS = 20
 CLAUDE_MAX_BUDGET_USD = 5.00
 CLAUDE_TIMEOUT_SEC = 1200
 
+# Prescreen — cheap sonnet pass that decides whether the item has regradable
+# content at all (skips auto-graded quizzes, submission-less items, etc.)
+# Saves ~$1-2 per non-regradable item by avoiding the opus-max workflow.
+CLAUDE_PRESCREEN_BINARY = os.environ.get("CLAUDE_PRESCREEN_BINARY", CLAUDE_BINARY)
+CLAUDE_PRESCREEN_MODEL = "sonnet"
+CLAUDE_PRESCREEN_EFFORT = "medium"
+CLAUDE_PRESCREEN_MAX_TURNS = 6
+CLAUDE_PRESCREEN_MAX_BUDGET_USD = 0.50
+CLAUDE_PRESCREEN_TIMEOUT_SEC = 300
+PRESCREEN_PROMPT = PROMPTS_DIR / "regrade_prescreen.md"
+
 # ── Web UI ───────────────────────────────────────────────────────────────────
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8765

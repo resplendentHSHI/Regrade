@@ -13,6 +13,17 @@ from gradescope_bot import config, storage
 log = logging.getLogger(__name__)
 
 
+PRESCREEN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["has_regradable_content", "reason"],
+    "additionalProperties": False,
+    "properties": {
+        "has_regradable_content": {"type": "boolean"},
+        "reason": {"type": "string"},
+    },
+}
+
+
 VERDICT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": [
@@ -67,6 +78,67 @@ def _render_prompt(item_id: str, item_dir: Path, pdf_pages: int) -> str:
     )
 
 
+def _render_prescreen_prompt(item_dir: Path, pdf_pages: int) -> str:
+    template = config.PRESCREEN_PROMPT.read_text(encoding="utf-8")
+    return template.format(
+        pdf_path=str(item_dir / "submission.pdf"),
+        pdf_pages=pdf_pages,
+        output_path=str(item_dir / "prescreen.json"),
+    )
+
+
+def _prescreen(item_id: str, item_dir: Path, pdf_pages: int) -> tuple[bool, str]:
+    """Run a cheap sonnet pass to decide if the item has regradable content.
+
+    Returns (has_regradable_content, reason). On any error, returns (True, reason)
+    so the main analyzer still runs — we'd rather over-check than skip.
+    """
+    prompt = _render_prescreen_prompt(item_dir, pdf_pages)
+    cmd = [
+        config.CLAUDE_PRESCREEN_BINARY, "-p", prompt,
+        "--model", config.CLAUDE_PRESCREEN_MODEL,
+        "--effort", config.CLAUDE_PRESCREEN_EFFORT,
+        "--output-format", "json",
+        "--json-schema", json.dumps(PRESCREEN_SCHEMA),
+        "--permission-mode", "acceptEdits",
+        "--add-dir", str(item_dir),
+        "--max-turns", str(config.CLAUDE_PRESCREEN_MAX_TURNS),
+        "--max-budget-usd", str(config.CLAUDE_PRESCREEN_MAX_BUDGET_USD),
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=config.CLAUDE_PRESCREEN_TIMEOUT_SEC,
+        )
+    except subprocess.TimeoutExpired:
+        log.warning("Prescreen timed out for %s; proceeding to full analyzer", item_id)
+        return True, "prescreen timed out, running full analysis"
+
+    if result.returncode != 0:
+        log.warning("Prescreen failed for %s (exit %s); proceeding to full analyzer",
+                    item_id, result.returncode)
+        return True, f"prescreen exit {result.returncode}, running full analysis"
+
+    prescreen_path = item_dir / "prescreen.json"
+    if not prescreen_path.exists():
+        log.warning("Prescreen wrote no file for %s; proceeding to full analyzer", item_id)
+        return True, "prescreen output missing, running full analysis"
+
+    try:
+        verdict = json.loads(prescreen_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        log.warning("Prescreen JSON invalid for %s: %s; proceeding to full analyzer",
+                    item_id, e)
+        return True, f"prescreen invalid JSON, running full analysis"
+
+    has = bool(verdict.get("has_regradable_content", True))
+    reason = str(verdict.get("reason", ""))
+    return has, reason
+
+
 def _count_pdf_pages(pdf_path: Path) -> int:
     """Best-effort page count. Uses pdfinfo if available, else returns 10."""
     try:
@@ -86,7 +158,13 @@ def _now_utc_iso() -> str:
 
 
 def analyze(item_id: str) -> None:
-    """Run `claude -p` on one queue item and update its state.json."""
+    """Run `claude -p` on one queue item and update its state.json.
+
+    Two-stage flow:
+      1. Cheap sonnet prescreen: does this PDF have regradable content at all?
+         If no, short-circuit to no_issues_found without invoking opus.
+      2. Full opus --effort max workflow (reads PDF, writes analysis.json + draft).
+    """
     item_dir = storage.item_dir(item_id)
     pdf_path = item_dir / "submission.pdf"
     if not pdf_path.exists():
@@ -94,6 +172,22 @@ def analyze(item_id: str) -> None:
         return
 
     pages = _count_pdf_pages(pdf_path)
+
+    # Stage 1: prescreen
+    has_content, prescreen_reason = _prescreen(item_id, item_dir, pages)
+    if not has_content:
+        log.info("Prescreen short-circuit for %s: %s", item_id, prescreen_reason)
+        storage.update_state(
+            item_id,
+            status="no_issues_found",
+            summary=f"Prescreen skipped deep analysis: {prescreen_reason}",
+            issue_count=0,
+            analyzed_at=_now_utc_iso(),
+            error=None,
+        )
+        return
+
+    # Stage 2: full analyzer
     prompt = _render_prompt(item_id, item_dir, pages)
 
     cmd = [

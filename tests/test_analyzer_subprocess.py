@@ -12,6 +12,14 @@ from gradescope_bot import analyzer, config, storage
 FAKE_DIR = Path(__file__).parent / "fixtures" / "fake_claude"
 
 
+@pytest.fixture(autouse=True)
+def _default_prescreen_yes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """By default, stub the prescreen to always say yes so main-path tests run."""
+    monkeypatch.setattr(
+        config, "CLAUDE_PRESCREEN_BINARY", str(FAKE_DIR / "fake_prescreen_yes.sh")
+    )
+
+
 def _seed_item(tmp_data_dir: Path, item_id: str) -> Path:
     state = {
         "id": item_id,
@@ -93,3 +101,44 @@ def test_analyze_malformed_json_sets_analysis_failed(
     state = storage.read_state("1222348_7453474")
     assert state["status"] == "analysis_failed"
     assert "json" in state["error"].lower()
+
+
+def test_prescreen_no_short_circuits_without_invoking_main_analyzer(
+    tmp_data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prescreen=false should set no_issues_found without touching CLAUDE_BINARY."""
+    monkeypatch.setattr(
+        config, "CLAUDE_PRESCREEN_BINARY", str(FAKE_DIR / "fake_prescreen_no.sh")
+    )
+    # Point the main binary at fake_claude_fail.sh — if it gets invoked,
+    # the test will fail loudly because that script exits 1 and would set
+    # status=analysis_failed. If the prescreen short-circuits correctly,
+    # the main binary is never called.
+    monkeypatch.setattr(config, "CLAUDE_BINARY", str(FAKE_DIR / "fake_claude_fail.sh"))
+    _seed_item(tmp_data_dir, "1222348_7453474")
+
+    analyzer.analyze("1222348_7453474")
+
+    state = storage.read_state("1222348_7453474")
+    assert state["status"] == "no_issues_found"
+    assert state["issue_count"] == 0
+    assert "Prescreen skipped" in state["summary"]
+    assert "online quiz" in state["summary"]
+
+
+def test_prescreen_failure_falls_through_to_main_analyzer(
+    tmp_data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the prescreen fails or errors, we still run the main analyzer."""
+    monkeypatch.setattr(
+        config, "CLAUDE_PRESCREEN_BINARY", str(FAKE_DIR / "fake_claude_fail.sh")
+    )
+    monkeypatch.setattr(config, "CLAUDE_BINARY", str(FAKE_DIR / "fake_claude_ok.sh"))
+    _seed_item(tmp_data_dir, "1222348_7453474")
+
+    analyzer.analyze("1222348_7453474")
+
+    state = storage.read_state("1222348_7453474")
+    # The main ok path produces needs_review with a Synthetic summary
+    assert state["status"] == "needs_review"
+    assert "Synthetic" in state["summary"]
