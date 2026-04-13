@@ -20,11 +20,15 @@ _CURRENT_SEMESTER_MONTHS = {
 }
 
 
-def _semester_matches_today(semester: str, year: int, now: datetime) -> bool:
+def _semester_matches_today(semester: str, year: int | str, now: datetime) -> bool:
     months = _CURRENT_SEMESTER_MONTHS.get(semester)
     if months is None:
         return False
-    return year == now.year and now.month in months
+    try:
+        year_int = int(year)
+    except (TypeError, ValueError):
+        return False
+    return year_int == now.year and now.month in months
 
 
 def _infer_type(name: str) -> str:

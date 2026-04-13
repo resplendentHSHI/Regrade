@@ -86,6 +86,24 @@ def test_fetcher_skips_ungraded_rows(tmp_data_dir: Path) -> None:
     assert storage.list_items() == []
 
 
+def test_fetcher_accepts_string_year_from_gradescopeapi_library(tmp_data_dir: Path) -> None:
+    """gradescopeapi's Course dataclass types year as str; the filter must coerce."""
+    courses = {"1222348": FakeCourse("1222348", "18-100: ECE", "2026", "Spring")}  # year is str
+    row = AssignmentRow(
+        assignment_id="7453474", submission_id="381362479", name="Homework 1",
+        score=10.0, max_score=10.0, due_date=None, status="graded",
+    )
+    dashboards = {"1222348": [row]}
+    pdfs = {("1222348", "7453474", "381362479"): b"%PDF-1.4\nx\n"}
+    client = _fake_client(courses, dashboards, pdfs)
+
+    fetcher.run_fetch_phase(client, now_local=lambda: datetime(2026, 4, 13, 2, 0, 0))
+
+    assert storage.read_state("1222348_7453474") is not None, (
+        "String year should coerce to int and be treated as active"
+    )
+
+
 def test_fetcher_is_idempotent_for_already_downloaded_item(tmp_data_dir: Path) -> None:
     courses = {"1222348": FakeCourse("1222348", "18-100: ECE", 2026, "Spring")}
     row = AssignmentRow(
