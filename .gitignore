@@ -1,0 +1,29 @@
+# Secrets
+.env
+
+# Runtime state
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Personal test artifacts (not part of the repo)
+submission_*.pdf
+18100 Dashboard _ Gradescope.html
+
+# Cloned reference (not part of this project)
+gradescope-api/
+
+# Claude Code project state
+.claude/
