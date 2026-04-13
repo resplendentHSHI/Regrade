@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -98,3 +100,49 @@ def serve_pdf(item_id: str):
     if not path.exists():
         return JSONResponse({"error": "not found"}, status_code=404)
     return FileResponse(str(path), media_type="application/pdf")
+
+
+@app.get("/item/{item_id}", response_class=HTMLResponse)
+def item_detail(request: Request, item_id: str):
+    state = storage.read_state(item_id)
+    if state is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    item_dir = config.QUEUE_DIR / item_id
+    draft_path = item_dir / "regrade_draft.md"
+    analysis_path = item_dir / "analysis.json"
+    draft_html = _md.render(draft_path.read_text(encoding="utf-8")) if draft_path.exists() else None
+    analysis_json = (
+        analysis_path.read_text(encoding="utf-8") if analysis_path.exists() else None
+    )
+    return templates.TemplateResponse(
+        request,
+        "item.html",
+        {
+            "state": state,
+            "draft_html": draft_html,
+            "analysis_json": analysis_json,
+            "heartbeat": _read_heartbeat(),
+        },
+    )
+
+
+@app.post("/item/{item_id}/review")
+def mark_reviewed(item_id: str):
+    storage.update_state(
+        item_id,
+        status="reviewed",
+        reviewed_at=datetime.now(timezone.utc).isoformat(),
+    )
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/item/{item_id}/reanalyze")
+def reanalyze(item_id: str):
+    item_dir = config.QUEUE_DIR / item_id
+    # Back up existing draft to avoid clobbering manual edits
+    draft = item_dir / "regrade_draft.md"
+    if draft.exists():
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        shutil.move(str(draft), str(item_dir / f"regrade_draft.md.bak-{ts}"))
+    storage.update_state(item_id, status="pending_analysis", error=None)
+    return RedirectResponse(url=f"/item/{item_id}", status_code=303)

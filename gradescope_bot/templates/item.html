@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ state.title }} — Gradescope Bot{% endblock %}
+{% block content %}
+<p><a href="/">← back to dashboard</a></p>
+<h2>{{ state.title }}</h2>
+<p class="meta">
+  {{ state.score }}/{{ state.max_score }} ·
+  status: <strong>{{ state.status }}</strong> ·
+  tags: {{ state.tags|join(", ") }}
+</p>
+
+{% if state.summary %}<p><strong>Summary:</strong> {{ state.summary }}</p>{% endif %}
+
+<div class="actions">
+  {% if state.status != "reviewed" %}
+    <form class="inline" method="post" action="/item/{{ state.id }}/review">
+      <button type="submit">Mark as reviewed</button>
+    </form>
+  {% endif %}
+  <form class="inline" method="post" action="/item/{{ state.id }}/reanalyze">
+    <button type="submit">Re-analyze (regenerates draft)</button>
+  </form>
+</div>
+
+<h3>Submission PDF</h3>
+<iframe class="pdf-frame" src="/queue/{{ state.id }}/submission.pdf"></iframe>
+
+{% if draft_html %}
+<h3>Regrade draft</h3>
+<div class="draft">{{ draft_html|safe }}</div>
+{% endif %}
+
+{% if analysis_json %}
+<h3>Raw analysis.json</h3>
+<pre class="analysis">{{ analysis_json }}</pre>
+{% endif %}
+{% endblock %}
