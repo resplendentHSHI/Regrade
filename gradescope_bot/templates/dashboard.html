@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h2>Filters</h2>
+  <div class="chips">
+    {% for chip in chips %}
+      <a class="chip {% if chip.active %}active{% endif %}" href="{{ chip.href }}">{{ chip.label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+{% for group in groups %}
+<section class="group">
+  <h2>{{ group.title }} ({{ group.entries|length }})</h2>
+  {% if group.entries %}
+    <ul class="items">
+      {% for item in group.entries %}
+        <li>
+          <a href="/item/{{ item.id }}">
+            <span class="title">{{ item.title }}</span>
+            <span class="summary">{{ item.summary or "" }}</span>
+            <span class="score">{{ item.score }}/{{ item.max_score }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty">None.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

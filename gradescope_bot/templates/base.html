@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}Gradescope Bot{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1><a href="/">Gradescope Bot</a></h1>
+  <div class="status">
+    {% if heartbeat %}
+      Last run: {{ heartbeat.last_run_local or "never" }}
+      · {{ heartbeat.last_status }}
+      · Next: {{ heartbeat.next_scheduled_local or "—" }}
+    {% else %}
+      No heartbeat yet.
+    {% endif %}
+  </div>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>
