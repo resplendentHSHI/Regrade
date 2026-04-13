@@ -25,6 +25,85 @@ The bot **never** auto-submits regrade requests. The user is always the final de
 - Mobile / remote access. Localhost only, no auth.
 - Pushing to Gradescope. Zero write-path to Gradescope's servers.
 
+## 2.5 Empirical findings about Gradescope (what we learned before writing this spec)
+
+This section captures concrete facts we verified by inspecting real Gradescope surfaces — the saved HTML of a course dashboard and three graded homework PDFs downloaded from the user's own account. Every design decision downstream depends on these findings being true, so they are documented explicitly.
+
+### 2.5.1 The course dashboard page (`/courses/{course_id}`)
+
+**Source inspected:** `18100 Dashboard _ Gradescope.html` — a real saved copy of `https://www.gradescope.com/courses/1222348` for the user's Spring 2026 ECE 18-100 course.
+
+**What we found:**
+
+1. **Server-rendered HTML, not JSON.** There is no `window.__INITIAL_STATE__`, no embedded JSON blob, and no `data-*` attributes carrying the assignment list. The assignment table is rendered server-side in the DOM; we parse it with BeautifulSoup.
+2. **Each assignment is one `<tr role="row">`** (the first `<tr>` is the header row and must be skipped).
+3. **Assignment name** lives in `<th class="table--primaryLink"><a>NAME</a></th>`.
+4. **The `<a>` tag's `href` is the single most valuable piece of data on the page.** It points directly at the student's own submission, in the form `/courses/{course_id}/assignments/{assignment_id}/submissions/{submission_id}`. This means the assignment ID **and** the submission ID are both available on the dashboard page in one request — no extra lookup needed to find the submission. This alone removes what would otherwise be an extra HTTP request per assignment.
+5. **Score appears** in `<td class="submissionStatus"><div class="submissionStatus--score">10.0 / 10.0</div></td>`. We parse the "<score> / <max>" format with a regex.
+6. **"Graded" is detected by presence of `.submissionStatus--score` AND absence of `.submissionStatus--text`.** The latter div only appears for ungraded states ("Submitted", "No Submission", etc.). This is our single authoritative signal for "download this one."
+7. **Due date** appears in `<time class="submissionTimeChart--dueDate" datetime="YYYY-MM-DD HH:MM:SS -ZZZZ">`. The `datetime` attribute is ISO-8601-ish and parses cleanly.
+8. **What is NOT on this page:**
+   - No "graded at" timestamp. We treat "first heartbeat run where we observed `status == graded`" as the effective graded timestamp.
+   - No assignment-type taxonomy (homework vs exam vs lab vs quiz). We infer type from the assignment name with a keyword map; users can override via tags.
+   - No per-question rubric data. That lives on the submission detail page and, more importantly, visually on the graded PDF itself (see 2.5.2).
+
+### 2.5.2 The graded submission PDF (`/courses/{cid}/assignments/{aid}/submissions/{sid}.pdf`)
+
+**Source inspected:** three real graded PDFs from the user's account — submissions 398420660 (10 pages, HW08 ADCs), 397845064 (24 pages, Lab 5 Op-Amp), 396787625 (12 pages, HW07 Capacitors). Confirmed by `pdfinfo` and by a full end-to-end analyzer smoke test.
+
+**What we found:**
+
+1. **The download URL is the submission page URL with `.pdf` appended — nothing more.** The user supplied a concrete example (`.../submissions/400080463` → `.../submissions/400080463.pdf`) and all three test downloads confirmed this pattern. One request. No HTML parsing. No scraping a download link out of the page.
+2. **The PDF MIME response starts with `%PDF`** as expected. Our validator checks this to distinguish a legitimate PDF from an auth-redirect HTML response masquerading as success.
+3. **The PDF `Title` metadata is `"Print Submission | Gradescope"` and the Producer is `Skia/PDF mNNN`** — confirming these are server-rendered Chrome-printed PDFs, not the student's original upload. This matters because:
+   - **The rubric is baked into the PDF visually.** Rubric item descriptions, points awarded/deducted, and the grader's comments are all overlaid on the pages as part of the rendered output. The student's work is visible beneath/alongside them.
+   - **Per-question scores and the overall score breakdown appear on page 1 or adjacent pages**, again as rendered text, legible to any multimodal reader.
+   - **Previously-submitted regrade requests and their resolutions are also visible in the PDF**, with timestamps and grader responses. The analyzer successfully used this information in smoke test #2 to avoid re-flagging questions that had already been through a denied regrade.
+4. **This eliminates an entire scraping subsystem.** We do NOT need to parse `/courses/{cid}/assignments/{aid}/submissions/{sid}.json?content=react` for rubric_items, points_awarded, file_comments, etc. The PDF is the complete source of truth. `rubric.json` is not a file in the queue folder.
+5. **Pages vary widely.** The three smoke-tested PDFs were 10, 12, and 24 pages. Gradescope's own PDF generator does not impose any student-visible page cap, so the bot must handle long PDFs gracefully. Claude Code's Read tool handles this by reading in `pages` ranges for PDFs > 10 pages — we tested this on the 24-page submission and it worked without special handling beyond telling the prompt to "read in page ranges (1-10, 11-20, ...) so you cover every page." The subprocess naturally uses 2–3 Read calls on long PDFs.
+6. **The graded PDF is ONLY meaningful after the grader has released grades.** Un-graded PDFs would lack the rubric overlays, score sidebar, and grader comments. Our `status == graded` filter on the dashboard ensures we never download pre-release PDFs, so this edge case is handled at the fetch step, not the analyzer step.
+
+### 2.5.3 The `gradescopeapi` library (`nyuoss/gradescope-api` 1.8.0)
+
+**Source inspected:** the full source tree at `src/gradescopeapi/` after `git clone`.
+
+**What the library gives us for free:**
+
+- `GSConnection.login(email, password)` → handles CSRF parsing, login POST, and returns an authenticated `requests.Session` that we can reuse for all downstream requests.
+- `Account.get_courses()` → returns `dict[str, dict[str, Course]]` with keys `"student"` and `"instructor"`, giving us the role separation we need to filter to enrolled-as-student courses. Each `Course` carries `semester` and `year` fields, which is how we detect "active this term."
+- Direct access to `connection.session` as a public attribute — we wrap its `.request` method to install our rate limiter, and we use it directly for our two custom scrapers.
+
+**What the library does NOT give us and we build ourselves:**
+
+- **PDF download.** Not implemented upstream. We add `download_submission_pdf` (one `GET`, one `.pdf` URL suffix, 5 lines of code).
+- **Per-assignment submission_id discovery.** `Account.get_assignments(course_id)` returns Assignment objects without the submission_id (it's the instructor-oriented listing endpoint). We bypass `get_assignments` entirely and instead scrape the course dashboard HTML (§ 6.2.1), which contains assignment_id AND submission_id AND score AND max_score AND status AND due_date in a single request. This is strictly fewer requests than going through the library.
+- **Per-question rubric JSON.** We'd need to hit `/submissions/{sid}.json?content=react&only_keys[]=text_files&only_keys[]=file_comments` and parse a react-state blob. **We don't need to.** The PDF contains everything (see 2.5.2.3).
+- **Rate limiting.** Not implemented upstream. We add our own.
+- **Graded timestamp.** Not reliably available anywhere short of scraping the submission detail page. We use "first seen graded" as a proxy, which is sufficient for our use case (ordering the queue and detecting newness).
+
+### 2.5.4 Claude Code on graded PDFs — what `--effort max` Opus actually does
+
+**Source inspected:** three real subprocess invocations (§ 13) with the exact analyzer command specified in § 8.1.
+
+**What we learned:**
+
+1. **The multimodal Read tool sees rubric overlays, handwriting, circuit diagrams, equations, and grader comments** all at once. No OCR step, no coordinate math, no PDF library. We hand it `submission.pdf` and ask questions.
+2. **The model reads the PDF in chunks when necessary** — a 24-page PDF required 2–3 Read calls with explicit page ranges. The prompt just says "read in page ranges (1-10, 11-20, ...) so you cover every page" and Claude handles the rest.
+3. **`--effort max` produces cross-question consistency reasoning** that lower effort levels would likely miss. In smoke test #1, the model noticed that the grader applied "Error carried over, correct setup" to Q6.2 but not to the directly analogous Q2.2 on the same submission, and used that as its regrade rationale. In smoke test #3, the model computed that τ = Rth·C = 1 ms with C = 1 μF uniquely requires Rth = 1 kΩ, and therefore the grader's acceptance of τ = 1 ms on Q3.G is mathematically incompatible with their rejection of Rth = 1 kΩ on Q3.F. This kind of multi-step reasoning across non-adjacent parts of the submission is what justifies the cost and latency of max-effort Opus.
+4. **The "reasonable person" filter in the prompt is load-bearing.** In smoke test #2, the model reviewed four judgment-call questions and explicitly rejected all of them, citing previously-denied regrade dialogue visible in the PDF. The phrase "Err strongly on the side of NOT flagging. False positives waste everyone's time" appears to be the operative instruction — we keep it verbatim in the prompt template.
+5. **`--json-schema` guarantees structured output without manual parsing.** All three tests produced schema-conforming JSON on stdout AND in the Write-tool-produced `analysis.json` file. We read the file rather than stdout because the file is simpler (no `{"type":"result",...}` wrapper) and because its existence doubles as a "subprocess finished cleanly" signal.
+6. **The model writes publication-quality Gradescope regrade drafts directly.** The three smoke tests produced drafts that cite specific page numbers, reference specific rubric item labels, and explain the mathematical or logical inconsistency the student believes warrants a re-review. The tone is respectful without being deferential. No post-processing of the drafts is required.
+7. **Cost varies ~2x between items.** $0.93 to $1.73 on the three tests. The driver appears to be how many kept issues the model ends up elaborating on — `no_issues_found` runs are cheaper because the output is short. We budget on the higher end (~$1.50 average, $5 per-invocation hard ceiling) to avoid surprises.
+8. **Wall-clock varies 4.5–9.7 minutes.** The 20-minute per-item timeout is generous headroom.
+
+### 2.5.5 What this means for the design
+
+- Our custom scraping surface is **two functions, about 60 lines of code total**, not a scraping subsystem.
+- Our request budget is small enough that the rate-limit caps (50/run, 150/day) are circuit breakers, not constraints we expect to hit in normal operation.
+- The analyzer can trust the PDF as the complete input. No separate rubric JSON to keep in sync.
+- The prompt and schema that passed all three smoke tests are committed verbatim into `prompts/regrade_check.md` and `analyzer.py`. No drift.
+- The Gradescope-facing code has one source of truth (the course dashboard HTML) and one file format to download (the annotated PDF). Everything else is local filesystem manipulation and a subprocess call. The project is smaller than it appears at first glance.
+
 ## 3. High-level architecture
 
 Two Python processes that share `data/` on the filesystem:
