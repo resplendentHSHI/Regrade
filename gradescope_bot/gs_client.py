@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
 import requests
+from bs4 import BeautifulSoup
 from gradescopeapi.classes.connection import GSConnection
 
 from gradescope_bot import config
@@ -18,6 +20,11 @@ from gradescope_bot.rate_limit import (
 )
 
 log = logging.getLogger(__name__)
+
+_HREF_RE = re.compile(
+    r"/courses/(?P<cid>\d+)/assignments/(?P<aid>\d+)(?:/submissions/(?P<sid>\d+))?"
+)
+_SCORE_RE = re.compile(r"([-\d.]+)\s*/\s*([\d.]+)")
 
 
 @dataclass
@@ -65,6 +72,12 @@ class GSClient:
             raise RuntimeError("Not logged in")
         return self._account.get_courses()
 
+    def fetch_course_dashboard(self, course_id: str) -> list[AssignmentRow]:
+        url = f"{config.GS_BASE_URL}/courses/{course_id}"
+        resp = self.session.get(url)
+        resp.raise_for_status()
+        return parse_course_dashboard(resp.text)
+
     # ── Private ────────────────────────────────────────────────────────────
 
     def _install_rate_limit(self, session: requests.Session) -> None:
@@ -89,3 +102,72 @@ class GSClient:
                 return resp
 
         session.request = rate_limited  # type: ignore[method-assign]
+
+
+def parse_course_dashboard(html: str) -> list[AssignmentRow]:
+    """Parse the HTML of /courses/{cid} into a list of AssignmentRow.
+
+    Detects graded rows by: has .submissionStatus--score AND no .submissionStatus--text.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    rows: list[AssignmentRow] = []
+    for tr in soup.select("tr[role=row]"):
+        link = tr.select_one("th.table--primaryLink a")
+        if link is None:
+            continue  # header row or non-assignment row
+
+        href = link.get("href", "")
+        m = _HREF_RE.search(href)
+        if m is None:
+            continue
+        name = link.get_text(strip=True)
+        if not name or name.lower() == "name":
+            continue
+
+        status_cell = tr.select_one("td.submissionStatus")
+        score_div = status_cell.select_one(".submissionStatus--score") if status_cell else None
+        text_div = status_cell.select_one(".submissionStatus--text") if status_cell else None
+
+        score: float | None = None
+        max_score: float | None = None
+        if score_div is not None:
+            m2 = _SCORE_RE.search(score_div.get_text())
+            if m2:
+                score = float(m2.group(1))
+                max_score = float(m2.group(2))
+
+        if score_div is not None and text_div is None:
+            status = "graded"
+        elif text_div is not None:
+            text = text_div.get_text(strip=True).lower()
+            if "no submission" in text:
+                status = "no_submission"
+            elif "late" in text:
+                status = "late"
+            elif "submitted" in text:
+                status = "submitted"
+            else:
+                status = "unknown"
+        else:
+            status = "unknown"
+
+        due_date: datetime | None = None
+        due_el = tr.select_one("time.submissionTimeChart--dueDate")
+        if due_el is not None and due_el.get("datetime"):
+            try:
+                due_date = datetime.fromisoformat(due_el["datetime"].replace(" ", "T", 1))
+            except ValueError:
+                due_date = None
+
+        rows.append(
+            AssignmentRow(
+                assignment_id=m.group("aid"),
+                submission_id=m.group("sid"),
+                name=name,
+                score=score,
+                max_score=max_score,
+                due_date=due_date,
+                status=status,
+            )
+        )
+    return rows
