@@ -6,18 +6,10 @@ interface SidecarResponse {
   [key: string]: unknown;
 }
 
-// Platform-specific paths for dev. In production, the sidecar would be bundled.
-const IS_MAC = navigator.userAgent.includes("Mac");
-const SIDECAR_DIR = IS_MAC
-  ? "/Users/xiaoxia/Desktop/poko/client/sidecar"
-  : "/home/hshi/Desktop/Gradescope-Bot/client/sidecar";
-const PYTHON_CMD = IS_MAC ? "python3-pyenv" : "python3-conda";
-
 async function runSidecar(args: string[]): Promise<SidecarResponse> {
-  const cmd = Command.create(PYTHON_CMD, [
-    `${SIDECAR_DIR}/sidecar_main.py`,
-    ...args,
-  ]);
+  // Use Tauri's sidecar mechanism — resolves to the bundled binary
+  // (binaries/poko-sidecar-{target_triple} in the app bundle)
+  const cmd = Command.sidecar("binaries/poko-sidecar", args);
 
   const output = await cmd.execute();
   if (output.stdout) {
