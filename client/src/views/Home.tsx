@@ -39,6 +39,7 @@ export function Home({ token }: HomeProps) {
   const [heartbeat, setHeartbeat] = useState<HeartbeatState | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [stats, setStats] = useState({ pointsRecovered: 0, pagesReviewed: 0, assignmentsAnalyzed: 0 });
+  const [liveQueueDepth, setLiveQueueDepth] = useState(0);
   const [serverOffline, setServerOffline] = useState(false);
   const [running, setRunning] = useState(false);
 
@@ -52,9 +53,18 @@ export function Home({ token }: HomeProps) {
     setStats({ pointsRecovered, pagesReviewed, assignmentsAnalyzed });
   }
 
+  async function loadQueueDepth() {
+    const assignments = await getAssignments();
+    const depth = assignments.filter((a: Assignment) =>
+      ["pending_upload", "uploading", "analyzing"].includes(a.status)
+    ).length;
+    setLiveQueueDepth(depth);
+  }
+
   async function loadData() {
     getHeartbeatState().then(setHeartbeat);
     getActivity().then((a) => setActivity(a.slice(0, 20)));
+    loadQueueDepth();
 
     if (token) {
       try {
@@ -159,8 +169,8 @@ export function Home({ token }: HomeProps) {
             </span>
           </div>
           <span>Next: {formatScheduledTime(heartbeat.nextScheduled)}</span>
-          {heartbeat.queueDepth > 0 && (
-            <Badge variant="secondary">{heartbeat.queueDepth} in queue</Badge>
+          {liveQueueDepth > 0 && (
+            <Badge variant="secondary">{liveQueueDepth} in queue</Badge>
           )}
           <Button
             size="sm"
