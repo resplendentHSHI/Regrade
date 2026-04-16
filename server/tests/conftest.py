@@ -29,8 +29,9 @@ def tmp_data_dir(tmp_path: Path):
 @pytest.fixture()
 def db_conn(tmp_data_dir: Path):
     """Create an in-memory DB with the schema applied."""
-    from poko_server.db import create_tables, get_connection
+    from poko_server.db import create_tables, get_connection, close_connection
     create_tables()
     conn = get_connection()
     yield conn
     conn.close()
+    close_connection()
