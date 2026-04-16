@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
+import { Onboarding } from "./views/Onboarding";
 import { getSettings } from "./lib/store";
 
 function Placeholder({ title }: { title: string }) {
@@ -22,11 +23,7 @@ export default function App() {
   if (onboarded === null) return null;
 
   if (!onboarded) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Placeholder title="Onboarding" />
-      </div>
-    );
+    return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
   return (

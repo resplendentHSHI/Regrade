@@ -51,3 +51,7 @@ export const getSettings = () => readJson<Settings>("settings.json", {
   onboardingComplete: false, serverUrl: "http://localhost:8080", notificationsEnabled: true,
 });
 export const saveSettings = (s: Settings) => writeJson("settings.json", s);
+
+interface Credentials { gsEmail: string; gsPassword: string; }
+export const getCredentials = () => readJson<Credentials>("credentials.json", { gsEmail: "", gsPassword: "" });
+export const saveCredentials = (c: Credentials) => writeJson("credentials.json", c);
