@@ -154,8 +154,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <li className="flex gap-3">
                   <span className="mt-0.5 shrink-0 text-primary">&#x1f5d1;</span>
                   <span>
-                    Your graded assignments are uploaded to our server for analysis, then permanently
-                    deleted immediately after processing. We never store your coursework.
+                    Your graded assignments are sent to our server for AI analysis. The PDF
+                    is permanently deleted from our server immediately after processing completes.
+                    We never retain your coursework.
                   </span>
                 </li>
                 <li className="flex gap-3">

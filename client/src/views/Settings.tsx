@@ -147,14 +147,14 @@ export function Settings() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            Poko downloads your graded PDFs and analyzes them locally using AI. Your
-            submissions never leave your device unless you explicitly submit a regrade
-            request through Gradescope.
+            Poko downloads your graded PDFs from Gradescope and sends them to our
+            server for AI analysis. The PDF is permanently deleted from our server
+            immediately after processing. We never retain your coursework.
           </p>
           <p>
-            Credentials are stored locally in your app data directory and are never
-            transmitted to any third-party server. The analysis server runs on your
-            own infrastructure.
+            Your Gradescope credentials are stored locally on your device only and
+            are never sent to our server. We only store your email, enabled courses,
+            and aggregate stats (pages reviewed, points recovered) on our server.
           </p>
           <p>
             You can delete all stored data at any time by signing out below.
