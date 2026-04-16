@@ -15,6 +15,11 @@ async function request(path: string, options: RequestInit & { token?: string } =
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;
       resp = await fetch(`${SERVER_URL}${path}`, { ...fetchOpts, headers });
+    } else {
+      // Refresh failed — clear expired token so app shows sign-in screen
+      localStorage.removeItem("poko_auth_token");
+      localStorage.removeItem("poko_refresh_token");
+      window.location.reload();
     }
   }
 

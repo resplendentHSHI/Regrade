@@ -44,7 +44,7 @@ NOTIFICATION_FROM_EMAIL = os.environ.get("NOTIFICATION_FROM_EMAIL", "Poko <onboa
 # ── Rate limits ────────────────────────────────────────────────────────
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 JOBS_PER_USER_PER_DAY = 50
-REQUESTS_PER_USER_PER_HOUR = 100
+REQUESTS_PER_USER_PER_HOUR = 500
 JOB_RESULT_RETENTION_DAYS = 7
 
 # ── Admin ──────────────────────────────────────────────────────────────
