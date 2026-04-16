@@ -1,18 +1,56 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
+use std::time::Duration;
 
 /// Start a local HTTP server on port 9876, open the OAuth URL in the browser,
 /// and wait for the callback. Returns the authorization code.
+///
+/// Times out after 3 minutes so the user can retry if they cancel.
 #[tauri::command]
 async fn start_oauth_flow(auth_url: String) -> Result<String, String> {
-    // Bind the callback server first
-    let listener = TcpListener::bind("127.0.0.1:9876").map_err(|e| format!("Failed to bind port 9876: {e}"))?;
+    // Bind the callback server first.
+    // If a previous attempt is still holding the port, retry a few times.
+    let mut listener = None;
+    for _ in 0..5 {
+        match TcpListener::bind("127.0.0.1:9876") {
+            Ok(l) => {
+                listener = Some(l);
+                break;
+            }
+            Err(_) => {
+                std::thread::sleep(Duration::from_millis(300));
+            }
+        }
+    }
+    let listener = listener.ok_or_else(|| {
+        "Port 9876 is in use. Close other tabs and try again.".to_string()
+    })?;
+
+    // Non-blocking accept with 3-minute timeout (user might close the tab)
+    listener
+        .set_nonblocking(true)
+        .map_err(|e| format!("nonblocking: {e}"))?;
 
     // Open the browser to the OAuth URL
     open::that(&auth_url).map_err(|e| format!("Failed to open browser: {e}"))?;
 
-    // Wait for one incoming connection (the OAuth redirect)
-    let (mut stream, _) = listener.accept().map_err(|e| format!("Failed to accept connection: {e}"))?;
+    // Poll for a connection up to 180 seconds
+    let deadline = std::time::Instant::now() + Duration::from_secs(180);
+    let (mut stream, _) = loop {
+        if std::time::Instant::now() > deadline {
+            return Err("Sign-in timed out. Tap Sign In to try again.".to_string());
+        }
+        match listener.accept() {
+            Ok(pair) => break pair,
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Err(e) => return Err(format!("Failed to accept connection: {e}")),
+        }
+    };
+    stream
+        .set_nonblocking(false)
+        .map_err(|e| format!("blocking: {e}"))?;
 
     let mut reader = BufReader::new(stream.try_clone().map_err(|e| format!("Clone error: {e}"))?);
     let mut request_line = String::new();

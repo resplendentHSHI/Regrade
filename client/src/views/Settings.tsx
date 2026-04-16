@@ -8,7 +8,6 @@ import {
   getSettings,
   saveSettings,
   getCredentials,
-  saveCredentials,
 } from "@/lib/store";
 import { signOut, getStoredToken } from "@/lib/auth";
 import * as api from "@/lib/api";
@@ -46,9 +45,30 @@ export function Settings() {
   };
 
   const handleSignOut = async () => {
-    await saveCredentials({ gsEmail: "", gsPassword: "" });
-    await saveSettings({ onboardingComplete: false, serverUrl: "http://localhost:8080", notificationsEnabled: true });
-    await saveCourses([]);
+    // Clear ALL local data — this backs up the privacy statement.
+    const fs = await import("@tauri-apps/plugin-fs");
+    const STORE_FILES = [
+      "credentials.json",
+      "courses.json",
+      "assignments.json",
+      "upcoming.json",
+      "activity.json",
+      "heartbeat.json",
+      "settings.json",
+      "pet.json",
+    ];
+    for (const name of STORE_FILES) {
+      try {
+        await fs.remove(`poko/${name}`, { baseDir: fs.BaseDirectory.AppData });
+      } catch { /* file may not exist */ }
+    }
+    // Also clear any downloaded PDFs
+    try {
+      await fs.remove("poko/pdfs", {
+        baseDir: fs.BaseDirectory.AppData,
+        recursive: true,
+      });
+    } catch { /* ignore */ }
     signOut();
   };
 
@@ -188,8 +208,10 @@ export function Settings() {
           <Button variant="destructive" onClick={handleSignOut}>
             Sign Out
           </Button>
-          <p className="text-xs text-muted-foreground mt-2">
-            This will clear all stored data and return to the onboarding screen.
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+            Deletes everything Poko has stored on this device: your Gradescope
+            credentials, downloaded PDFs, analysis results, activity log, and
+            your pet. Your server-side account stays until you delete it there.
           </p>
         </CardContent>
       </Card>

@@ -89,11 +89,28 @@ function CompletedIcon({ status }: { status: string }) {
   return <CheckCircle className="h-4 w-4 text-emerald-500" />;
 }
 
-function completedLabel(status: string): string {
-  if (status === "regrade_candidates") return "Regrade Candidates";
+function completedLabel(status: string, topTier?: string): string {
+  if (status === "regrade_candidates") {
+    if (topTier === "critical") return "Likely Regrade";
+    if (topTier === "strong") return "Possible Regrade";
+    return "Maybe Worth Reviewing";
+  }
   if (status === "failed") return "Failed";
-  if (status === "no_issues") return "No Issues";
+  if (status === "no_issues") return "All Good";
   return "Reviewed";
+}
+
+function topTier(resultJson?: string): string | undefined {
+  if (!resultJson) return undefined;
+  try {
+    const parsed = JSON.parse(resultJson);
+    const kept: Array<{ confidence_tier?: string; keep?: boolean }> =
+      (parsed.issues || []).filter((i: { keep?: boolean }) => i.keep);
+    if (kept.some((i) => i.confidence_tier === "critical")) return "critical";
+    if (kept.some((i) => i.confidence_tier === "strong")) return "strong";
+    if (kept.some((i) => i.confidence_tier === "marginal")) return "marginal";
+  } catch { /* ignore */ }
+  return undefined;
 }
 
 /* ──────────────────── Manual Add Dialog ──────────────────── */
@@ -570,7 +587,7 @@ export function Queue() {
                                   }
                                   className={isRegrade ? "bg-amber-500 text-white" : ""}
                                 >
-                                  {completedLabel(a.status)}
+                                  {completedLabel(a.status, topTier(a.resultJson))}
                                 </Badge>
                               </div>
                             </button>

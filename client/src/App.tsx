@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [attempts, setAttempts] = useState(0);
 
   async function handleSignIn() {
     setLoading(true);
@@ -27,25 +28,35 @@ function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
       onSignIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
+      setAttempts((a) => a + 1);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-sm rounded-3xl border-primary/20">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to Poko</CardTitle>
-          <p className="text-muted-foreground text-sm mt-1">
-            Your intelligent grading assistant
+          <CardTitle className="font-heading text-3xl">Welcome to Poko</CardTitle>
+          <p className="display-italic text-muted-foreground text-sm mt-1">
+            your grade companion
           </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={handleSignIn} disabled={loading} className="w-full">
-            {loading ? "Signing in..." : "Sign in with Google"}
+        <CardContent className="space-y-3">
+          <Button onClick={handleSignIn} disabled={loading} className="w-full rounded-xl">
+            {loading ? "Opening browser..." : attempts > 0 ? "Try Again" : "Sign in with Google"}
           </Button>
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+          {error && (
+            <div className="text-xs text-destructive text-center px-2 leading-relaxed">
+              {error}
+            </div>
+          )}
+          {loading && (
+            <p className="text-xs text-muted-foreground text-center">
+              Complete the sign-in in your browser. You can close the tab after.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
