@@ -7,6 +7,9 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from poko_server import db, config
+from poko_server.jobs import process_pending_jobs
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -93,3 +96,29 @@ def test_job_not_found(client, auth_headers, tmp_data_dir):
     with _mock_auth():
         resp = client.get("/jobs/nonexistent/status", headers=auth_headers)
     assert resp.status_code == 404
+
+
+def test_process_pending_job(db_conn, tmp_data_dir):
+    """End-to-end: upload → process → result available."""
+    user = db.create_user("process-test@gmail.com")
+    job = db.create_job(user_id=user["id"], pdf_hash="proc123", course_id="1001",
+                        assignment_id="2001", assignment_name="HW1", course_name="MATH 101")
+    job_dir = config.UPLOAD_DIR / job["id"]
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "submission.pdf").write_bytes((FIXTURES / "sample.pdf").read_bytes())
+
+    with patch.object(config, "CLAUDE_PRESCREEN_BINARY", str(FIXTURES / "fake_prescreen_yes.sh")), \
+         patch.object(config, "CLAUDE_BINARY", str(FIXTURES / "fake_claude_ok.sh")):
+        counts = process_pending_jobs()
+
+    assert counts["processed"] == 1
+    assert counts["complete"] == 1
+    updated = db.get_job(job["id"])
+    assert updated["status"] == "complete"
+    assert updated["result_json"] is not None
+    assert updated["draft_md"] is not None
+
+
+def test_process_no_pending_jobs(db_conn, tmp_data_dir):
+    counts = process_pending_jobs()
+    assert counts["processed"] == 0
