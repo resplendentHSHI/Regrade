@@ -23,6 +23,17 @@
       "csp": null
     }
   },
+  "plugins": {
+    "shell": {
+      "scope": [
+        {
+          "name": "python3",
+          "cmd": "python3",
+          "args": true
+        }
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

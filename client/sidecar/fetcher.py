@@ -112,7 +112,7 @@ def fetch_graded(
     client: GSClient,
     course_ids: list[str],
     data_dir: str | Path,
-    existing_hashes: dict[str, str] | None = None,
+    existing_hashes: list[str] | None = None,
     now_local: Callable[[], datetime] = lambda: datetime.now().astimezone(),
 ) -> dict:
     """Download new graded PDFs. Returns {"items": [...], "scores": [...]}.
@@ -128,31 +128,29 @@ def fetch_graded(
         {
             "items": [
                 {
-                    "id": str,
-                    "title": str,
                     "course_id": str,
                     "assignment_id": str,
                     "submission_id": str,
-                    "tags": [str, ...],
+                    "name": str,
+                    "score": float | null,
+                    "max_score": float | null,
                     "due_date": str | null,
-                    "first_seen_local": str,
-                    "pdf_path": str | null,
-                    "pdf_sha256": str | null,
-                    "status": str,
-                    "error": str | null,
+                    "type": str,
+                    "pdf_hash": str,
+                    "pdf_path": str,
                 }
             ],
             "scores": [
                 {
-                    "item_id": str,
+                    "course_id": str,
+                    "assignment_id": str,
                     "score": float | null,
                     "max_score": float | null,
                 }
             ],
         }
     """
-    if existing_hashes is None:
-        existing_hashes = {}
+    existing_hashes_set = set(existing_hashes or [])
 
     data_dir = Path(data_dir)
     now = now_local()
@@ -183,30 +181,23 @@ def fetch_graded(
 
             # Record the score regardless of whether we download the PDF
             scores.append({
-                "item_id": item_id,
+                "course_id": str(course_id),
+                "assignment_id": row.assignment_id,
                 "score": row.score,
                 "max_score": row.max_score,
             })
 
-            if item_id in existing_hashes:
-                log.debug("Skipping already-downloaded %s", item_id)
-                continue
-
             item: dict = {
-                "id": item_id,
-                "title": row.name,
                 "course_id": str(course_id),
                 "assignment_id": row.assignment_id,
                 "submission_id": row.submission_id,
-                "tags": [
-                    f"type:{_infer_type(row.name)}",
-                ],
+                "name": row.name,
+                "score": row.score,
+                "max_score": row.max_score,
                 "due_date": row.due_date.isoformat() if row.due_date else None,
-                "first_seen_local": now.isoformat(),
+                "type": _infer_type(row.name),
+                "pdf_hash": None,
                 "pdf_path": None,
-                "pdf_sha256": None,
-                "status": "pending_download",
-                "error": None,
             }
 
             try:
@@ -217,9 +208,7 @@ def fetch_graded(
                 raise
             except Exception as e:
                 log.warning("PDF download failed for %s: %s", item_id, e)
-                item["status"] = "error"
-                item["error"] = str(e)
-                items.append(item)
+                log.warning("Skipping %s due to download error", item_id)
                 continue
 
             item_dir = data_dir / item_id
@@ -228,9 +217,12 @@ def fetch_graded(
             pdf_path.write_bytes(pdf_bytes)
 
             sha = hashlib.sha256(pdf_bytes).hexdigest()
+            if sha in existing_hashes_set:
+                log.debug("Skipping already-known hash %s for %s", sha[:8], item_id)
+                pdf_path.unlink(missing_ok=True)
+                continue
             item["pdf_path"] = str(pdf_path)
-            item["pdf_sha256"] = sha
-            item["status"] = "pending_analysis"
+            item["pdf_hash"] = sha
             items.append(item)
             log.info("Downloaded %s (%s)", item_id, row.name)
 
