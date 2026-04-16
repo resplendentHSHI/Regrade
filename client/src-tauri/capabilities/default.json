@@ -9,21 +9,17 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        {
-          "name": "python3",
-          "cmd": "python3",
-          "args": true
-        }
+        { "name": "python3", "cmd": "python3", "args": true },
+        { "name": "python3-pyenv", "cmd": "/Users/xiaoxia/.pyenv/versions/3.12.8/bin/python3", "args": true },
+        { "name": "python3-conda", "cmd": "/home/hshi/miniconda3/envs/GSdev/bin/python", "args": true }
       ]
     },
     {
       "identifier": "shell:allow-spawn",
       "allow": [
-        {
-          "name": "python3",
-          "cmd": "python3",
-          "args": true
-        }
+        { "name": "python3", "cmd": "python3", "args": true },
+        { "name": "python3-pyenv", "cmd": "/Users/xiaoxia/.pyenv/versions/3.12.8/bin/python3", "args": true },
+        { "name": "python3-conda", "cmd": "/home/hshi/miniconda3/envs/GSdev/bin/python", "args": true }
       ]
     },
     "fs:default",

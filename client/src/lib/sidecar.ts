@@ -6,16 +6,15 @@ interface SidecarResponse {
   [key: string]: unknown;
 }
 
-// Resolve sidecar path relative to the app. Adjust per platform.
+// Platform-specific paths for dev. In production, the sidecar would be bundled.
 const IS_MAC = navigator.userAgent.includes("Mac");
 const SIDECAR_DIR = IS_MAC
   ? "/Users/xiaoxia/Desktop/poko/client/sidecar"
   : "/home/hshi/Desktop/Gradescope-Bot/client/sidecar";
+const PYTHON_CMD = IS_MAC ? "python3-pyenv" : "python3-conda";
 
 async function runSidecar(args: string[]): Promise<SidecarResponse> {
-  // "python3" is the scoped command name — maps to the full conda python path
-  // in src-tauri/capabilities/default.json
-  const cmd = Command.create("python3", [
+  const cmd = Command.create(PYTHON_CMD, [
     `${SIDECAR_DIR}/sidecar_main.py`,
     ...args,
   ]);
