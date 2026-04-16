@@ -25,7 +25,7 @@ DEV_EMAIL = os.environ.get("POKO_DEV_EMAIL", "dev@poko.local")
 # ── Analyzer ───────────────────────────────────────────────────────────
 CLAUDE_BINARY = os.environ.get("CLAUDE_BINARY", "claude")
 CLAUDE_MODEL = "opus"
-CLAUDE_EFFORT = "max"
+CLAUDE_EFFORT = "low"
 CLAUDE_MAX_TURNS = 20
 CLAUDE_MAX_BUDGET_USD = 5.00
 CLAUDE_TIMEOUT_SEC = 1200

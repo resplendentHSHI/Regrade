@@ -29,3 +29,4 @@ gradescope-api/
 .claude/
 server/.env
 client/.env
+.superpowers/
