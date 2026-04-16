@@ -7,19 +7,23 @@ interface SidecarResponse {
 }
 
 async function runSidecar(args: string[]): Promise<SidecarResponse> {
-  // Use Tauri's sidecar mechanism — resolves to the bundled binary
-  // (binaries/poko-sidecar-{target_triple} in the app bundle)
-  const cmd = Command.sidecar("binaries/poko-sidecar", args);
-
-  const output = await cmd.execute();
-  if (output.stdout) {
-    try {
-      return JSON.parse(output.stdout.trim());
-    } catch {
-      return { ok: false, error: `Invalid JSON: ${output.stdout}` };
+  try {
+    const cmd = Command.sidecar("binaries/poko-sidecar", args);
+    const output = await cmd.execute();
+    if (output.stdout) {
+      try {
+        return JSON.parse(output.stdout.trim());
+      } catch {
+        return { ok: false, error: `Invalid JSON from sidecar: ${output.stdout.slice(0, 200)}` };
+      }
     }
+    return { ok: false, error: output.stderr || "No output from sidecar" };
+  } catch (err) {
+    // Surface the actual error from Tauri/shell plugin
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Sidecar invocation failed:", msg);
+    return { ok: false, error: `Sidecar error: ${msg}` };
   }
-  return { ok: false, error: output.stderr || "No output from sidecar" };
 }
 
 export async function testLogin(email: string, password: string): Promise<{ ok: boolean; error?: string }> {
