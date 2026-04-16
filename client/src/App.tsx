@@ -2,16 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Onboarding } from "./views/Onboarding";
+import { Home } from "./views/Home";
+import { Assignments } from "./views/Assignments";
+import { AssignmentDetail } from "./views/AssignmentDetail";
+import { Upcoming } from "./views/Upcoming";
+import { Settings } from "./views/Settings";
 import { getSettings } from "./lib/store";
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="p-8">
-      <h2 className="text-2xl font-bold">{title}</h2>
-      <p className="text-muted-foreground mt-2">Coming soon</p>
-    </div>
-  );
-}
 
 export default function App() {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -32,11 +28,11 @@ export default function App() {
         <Sidebar />
         <main className="flex-1 overflow-auto">
           <Routes>
-            <Route path="/" element={<Placeholder title="Home" />} />
-            <Route path="/assignments" element={<Placeholder title="Assignments" />} />
-            <Route path="/assignments/:id" element={<Placeholder title="Assignment Detail" />} />
-            <Route path="/upcoming" element={<Placeholder title="Upcoming" />} />
-            <Route path="/settings" element={<Placeholder title="Settings" />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/assignments" element={<Assignments />} />
+            <Route path="/assignments/:id" element={<AssignmentDetail />} />
+            <Route path="/upcoming" element={<Upcoming />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
