@@ -25,6 +25,9 @@
     "fs:allow-temp-write-recursive",
     "fs:allow-remove",
     "core:app:default",
-    "core:path:default"
+    "core:path:default",
+    "updater:default",
+    "process:default",
+    "process:allow-restart"
   ]
 }

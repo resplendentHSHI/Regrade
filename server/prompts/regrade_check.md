@@ -29,18 +29,24 @@ rubric items, points awarded/deducted, grader comments, and the per-question sco
 5. Write the structured verdict to `{output_path}` using the Write tool, conforming to the JSON
    schema provided. Set item_id to "{item_id}".
 6. If and only if the verdict contains at least one kept issue, also write `{draft_path}` with
-   one section per kept issue in this format:
+   one section per kept issue in this format. **Keep each regrade message short and direct —
+   2 to 4 sentences max.** The student will paste this into Gradescope's regrade request box,
+   and graders prefer concise, specific requests over long ones.
 
-   # Regrade Requests — <assignment title> (<course if visible>)
+   # Regrade Requests — <assignment title>
 
    ## Question <N> — <short description>
 
-   **Requesting regrade for:** <X points deducted under "rubric item">
-
-   **Reason for request:**
-   <1-2 paragraphs, respectful tone, citing specific page numbers and what the student wrote>
+   Hi! Could you please take another look at Q<N>? <One concise sentence describing what
+   the student did and why the deduction seems off, citing the specific rubric item or
+   comment.> <Optional second sentence with page reference or a specific detail that
+   supports the request.> Thank you!
 
    ---
+
+   Tone: polite, direct, no hedging about "if you have time" or "I was wondering if
+   maybe possibly." Just the facts and the ask. Do NOT include a "Requesting regrade
+   for: X points" header — that's redundant with Gradescope's own UI.
 
 ## Output requirements
 

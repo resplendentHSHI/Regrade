@@ -14,9 +14,11 @@ permissions:
 jobs:
   build:
     runs-on: macos-14  # Apple Silicon (arm64)
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -41,6 +43,37 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Compute version from commit
+        id: version
+        env:
+          GITHUB_SHA_ENV: ${{ github.sha }}
+        run: |
+          # Use the UTC date + short SHA as a monotonic version: 0.1.YYYYMMDDHHMM
+          STAMP=$(date -u +'%Y%m%d.%H%M')
+          VERSION="0.1.${STAMP}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA_ENV:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Patch version into tauri.conf.json + Cargo.toml
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 <<PY
+          import json, os, re
+          v = os.environ["APP_VERSION"]
+          # tauri.conf.json
+          p = "client/src-tauri/tauri.conf.json"
+          with open(p) as f: d = json.load(f)
+          d["version"] = v
+          with open(p, "w") as f: json.dump(d, f, indent=2)
+          # Cargo.toml
+          p = "client/src-tauri/Cargo.toml"
+          with open(p) as f: s = f.read()
+          s = re.sub(r'^version\s*=\s*"[^"]+"', f'version = "{v}"', s, count=1, flags=re.M)
+          with open(p, "w") as f: f.write(s)
+          PY
+
       - name: Install Python sidecar dependencies
         working-directory: client/sidecar
         run: |
@@ -59,35 +92,76 @@ jobs:
         working-directory: client
         run: bun install
 
-      - name: Build Tauri app
+      - name: Build Tauri app (signed updater bundle)
         working-directory: client
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: |
           bun run build
           bun run tauri build
 
-      - name: Locate artifacts
-        id: artifacts
+      - name: Generate latest.json manifest for auto-updater
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          SHA_SHORT: ${{ steps.version.outputs.short_sha }}
+          REPO: ${{ github.repository }}
         run: |
-          DMG=$(find client/src-tauri/target/release/bundle/dmg -name "*.dmg" 2>/dev/null | head -1)
-          echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
-          echo "DMG: $DMG"
+          BUNDLE_DIR="client/src-tauri/target/release/bundle"
+          # Tauri v2 emits: macos/Poko.app.tar.gz and .sig for the updater
+          TARBALL=$(find "$BUNDLE_DIR/macos" -name "*.app.tar.gz" | head -1)
+          SIGFILE="${TARBALL}.sig"
 
-      - name: Zip .app as fallback (if .dmg didn't build)
-        if: steps.artifacts.outputs.dmg == ''
-        run: |
-          cd client/src-tauri/target/release/bundle/macos
-          zip -r Poko-mac.zip *.app
+          if [ -z "$TARBALL" ] || [ ! -f "$SIGFILE" ]; then
+            echo "ERROR: updater artifacts not found"
+            ls -R "$BUNDLE_DIR"
+            exit 1
+          fi
+
+          SIG_CONTENT=$(cat "$SIGFILE")
+          PUB_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+          # The updater URL uses the release tag "latest-mac"
+          UPDATER_URL="https://github.com/${REPO}/releases/download/latest-mac/Poko.app.tar.gz"
+
+          cat > latest.json <<EOF
+          {
+            "version": "${APP_VERSION}",
+            "notes": "Poko build ${SHA_SHORT}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${SIG_CONTENT}",
+                "url": "${UPDATER_URL}"
+              },
+              "darwin-x86_64": {
+                "signature": "${SIG_CONTENT}",
+                "url": "${UPDATER_URL}"
+              }
+            }
+          }
+          EOF
+
+          # Copy artifacts to predictable names
+          cp "$TARBALL" "Poko.app.tar.gz"
+          DMG=$(find "$BUNDLE_DIR/dmg" -name "*.dmg" | head -1)
+          if [ -n "$DMG" ]; then
+            cp "$DMG" "Poko-mac.dmg"
+          fi
+
+          echo "Artifacts ready:"
+          ls -lh Poko.app.tar.gz Poko-mac.dmg latest.json 2>&1 || true
 
       - name: Upload build as artifact
         uses: actions/upload-artifact@v4
         with:
           name: Poko-mac
           path: |
-            client/src-tauri/target/release/bundle/dmg/*.dmg
-            client/src-tauri/target/release/bundle/macos/*.zip
+            Poko-mac.dmg
+            Poko.app.tar.gz
+            latest.json
 
       - name: Publish rolling latest-mac release
         if: github.ref == 'refs/heads/poko-server' || github.ref == 'refs/heads/main'
@@ -96,26 +170,19 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-          DMG_PATH: ${{ steps.artifacts.outputs.dmg }}
+          APP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           TAG="latest-mac"
           SHA_SHORT="${SHA:0:7}"
 
-          # Pick the artifact — prefer .dmg
-          if [ -n "$DMG_PATH" ] && [ -f "$DMG_PATH" ]; then
-            cp "$DMG_PATH" "Poko-mac.dmg"
-            ASSET="Poko-mac.dmg"
-          else
-            ZIP=$(find client/src-tauri/target/release/bundle -name "Poko-mac.zip" | head -1)
-            cp "$ZIP" "Poko-mac.zip"
-            ASSET="Poko-mac.zip"
-          fi
-
-          # Delete old release so the asset URL stays stable at /releases/download/latest-mac/$ASSET
+          # Delete old release so asset URLs stay stable
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
 
-          NOTES="Auto-built from branch \`${REF_NAME}\` @ ${SHA_SHORT}"$'\n\n'"**Download:** [${ASSET}](https://github.com/${REPO}/releases/download/${TAG}/${ASSET})"$'\n\n'"Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          NOTES="Poko v${APP_VERSION} · built from branch \`${REF_NAME}\` @ ${SHA_SHORT}"$'\n\n'"**New download:** [Poko-mac.dmg](https://github.com/${REPO}/releases/download/${TAG}/Poko-mac.dmg)"$'\n\n'"**Existing Poko apps will auto-update via the in-app banner.**"$'\n\n'"Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
 
-          gh release create "$TAG" "$ASSET" \
-            --title "Latest macOS Build" \
+          gh release create "$TAG" \
+            Poko-mac.dmg \
+            Poko.app.tar.gz \
+            latest.json \
+            --title "Poko v${APP_VERSION}" \
             --notes "$NOTES"
