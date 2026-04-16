@@ -19,6 +19,8 @@ PRESCREEN_PROMPT = PROMPTS_DIR / "regrade_prescreen.md"
 
 # ── Auth ───────────────────────────────────────────────────────────────
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+DEV_MODE = os.environ.get("POKO_DEV_MODE", "0") == "1"
+DEV_EMAIL = os.environ.get("POKO_DEV_EMAIL", "dev@poko.local")
 
 # ── Analyzer ───────────────────────────────────────────────────────────
 CLAUDE_BINARY = os.environ.get("CLAUDE_BINARY", "claude")
