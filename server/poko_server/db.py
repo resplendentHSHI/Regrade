@@ -15,7 +15,7 @@ def get_connection() -> sqlite3.Connection:
     """Return (and cache) a SQLite connection to the configured DB path."""
     global _connection
     if _connection is None:
-        _connection = sqlite3.connect(str(config.DB_PATH))
+        _connection = sqlite3.connect(str(config.DB_PATH), check_same_thread=False)
         _connection.row_factory = sqlite3.Row
         _connection.execute("PRAGMA journal_mode=WAL")
         _connection.execute("PRAGMA foreign_keys=ON")
