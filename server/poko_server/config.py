@@ -47,6 +47,9 @@ JOBS_PER_USER_PER_DAY = 50
 REQUESTS_PER_USER_PER_HOUR = 500
 JOB_RESULT_RETENTION_DAYS = 7
 
+# ── Public URL ────────────────────────────────────────────────────────
+FUNNEL_URL = os.environ.get("POKO_FUNNEL_URL", "")
+
 # ── Admin ──────────────────────────────────────────────────────────────
 ADMIN_SECRET = os.environ.get("POKO_ADMIN_SECRET", "")
 

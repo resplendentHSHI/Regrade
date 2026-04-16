@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from poko_server import config, db
 from poko_server.auth import get_current_user_email
-from poko_server.jobs import recover_interrupted_jobs, cleanup_old_jobs, start_worker
+from poko_server.jobs import recover_interrupted_jobs, cleanup_old_jobs, start_worker, stop_worker
 from poko_server.metrics import process_score_sync
 
 log = logging.getLogger(__name__)
@@ -78,11 +78,26 @@ def _validate_field(value: str, name: str) -> str:
 
 @app.on_event("startup")
 def startup():
+    # Backup before any migrations so we have a safe restore point
+    backup_path = db.backup_db()
+    if backup_path:
+        log.info("Database backed up to %s", backup_path)
+
     db.create_tables()
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    if config.DEV_MODE:
-        log.warning("⚠ SERVER RUNNING IN DEV MODE — dev-token-placeholder accepted")
+
+    # Startup banner
+    dev_label = "on" if config.DEV_MODE else "off"
+    funnel_label = config.FUNNEL_URL if config.FUNNEL_URL else "(not set)"
+    log.info(
+        "Poko Server v0.1.0  |  Database: %s  |  Uploads: %s  |  Dev mode: %s  |  Funnel URL: %s",
+        config.DB_PATH,
+        config.UPLOAD_DIR,
+        dev_label,
+        funnel_label,
+    )
+
     recovered = recover_interrupted_jobs()
     if recovered:
         log.info("Recovered %d interrupted jobs", recovered)
@@ -94,6 +109,7 @@ def startup():
 
 @app.on_event("shutdown")
 def shutdown():
+    stop_worker()
     db.close_connection()
 
 
@@ -101,8 +117,33 @@ def shutdown():
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log every API request for analytics."""
+    """Log every request with timestamp, user email, method, path, status, response time."""
+    start = time.time()
     response = await call_next(request)
+    elapsed_ms = round((time.time() - start) * 1000, 1)
+
+    # Extract user email from Authorization header (best-effort, no verification here)
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):]
+        # In dev mode, resolve the dev token to its email directly
+        if config.DEV_MODE and token == "dev-token-placeholder":
+            user_label = config.DEV_EMAIL
+        else:
+            # We don't verify the token here; use a placeholder so the log is still useful
+            user_label = "<authenticated>"
+    else:
+        user_label = "<anonymous>"
+
+    log.info(
+        "%s %s %s %d %.1fms",
+        user_label,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+
     if request.url.path not in ("/health", "/admin/stats"):
         try:
             db.log_event("api_request", detail=f"{request.method} {request.url.path}")
@@ -132,6 +173,18 @@ def admin_stats(request: Request):
     stats = db.get_server_stats()
     stats["uptime_seconds"] = round(time.monotonic() - _start_time, 1)
     return stats
+
+
+@app.get("/admin/users")
+def admin_users(request: Request):
+    """List all users with aggregate stats. Protected by admin secret."""
+    admin_secret = config.ADMIN_SECRET
+    provided = request.query_params.get("secret", "")
+    if not admin_secret or not hmac.compare_digest(provided, admin_secret):
+        log.warning("Unauthorized admin users attempt from %s", request.client.host if request.client else "unknown")
+        raise HTTPException(status_code=403, detail="Forbidden")
+    users = db.get_all_users_with_stats()
+    return {"users": users}
 
 
 @app.post("/auth/verify")

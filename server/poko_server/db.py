@@ -1,10 +1,12 @@
 """SQLite database layer for the Poko server."""
 from __future__ import annotations
 
+import shutil
 import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from poko_server import config
@@ -103,6 +105,33 @@ def create_tables() -> None:
         );
     """)
     conn.commit()
+
+
+# ── Backup ────────────────────────────────────────────────────────────────────
+
+def backup_db(keep: int = 5) -> Optional[Path]:
+    """Copy the SQLite DB to data/backups/poko_YYYYMMDD_HHMMSS.db.
+
+    Returns the path of the new backup, or None if the DB does not exist yet.
+    Keeps only the most recent *keep* backups (deletes older ones).
+    """
+    db_path = config.DB_PATH
+    if not db_path.exists():
+        return None
+
+    backup_dir = config.DATA_DIR / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    dest = backup_dir / f"poko_{stamp}.db"
+    shutil.copy2(str(db_path), str(dest))
+
+    # Prune old backups, keeping the *keep* most recent
+    existing = sorted(backup_dir.glob("poko_*.db"))
+    for old in existing[:-keep]:
+        old.unlink(missing_ok=True)
+
+    return dest
 
 
 # ── Users ──────────────────────────────────────────────────────────────────────
@@ -304,6 +333,22 @@ def log_event(event_type: str, user_id: str | None = None, detail: str = "") -> 
         (event_type, user_id, detail, _now()),
     )
     conn.commit()
+
+
+def get_all_users_with_stats() -> list[dict[str, Any]]:
+    """Return all users with their aggregate metrics."""
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT u.email, u.created_at,
+               COALESCE(m.assignments_analyzed, 0) AS assignments_analyzed,
+               COALESCE(m.points_recovered, 0.0)   AS points_recovered
+        FROM users u
+        LEFT JOIN metrics m ON m.user_id = u.id
+        ORDER BY u.created_at
+        """
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_server_stats() -> dict[str, Any]:

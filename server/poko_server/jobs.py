@@ -13,15 +13,27 @@ from poko_server.notifications import should_notify, send_notification, build_em
 
 log = logging.getLogger(__name__)
 
+# Set this Event to request a clean worker shutdown.
+_stop_event = threading.Event()
+
 
 def process_pending_jobs() -> dict[str, int]:
-    """Find all uploaded jobs, analyze them, update DB. Returns counters."""
+    """Find all uploaded jobs whose upload directory exists, analyze them,
+    update DB. Jobs whose directory is missing are skipped (not counted).
+    Returns counters."""
     counters = {"processed": 0, "complete": 0, "failed": 0}
     pending = db.list_jobs_by_status("uploaded")
 
     for job in pending:
         job_id = job["id"]
         job_dir = config.UPLOAD_DIR / job_id
+
+        # Skip jobs whose upload directory is gone (e.g. externally removed)
+        # — these are "stale" uploaded rows, not active jobs.
+        if not job_dir.exists():
+            log.debug("Skipping job %s: upload directory missing", job_id)
+            continue
+
         log.info("Processing job %s", job_id)
 
         db.update_job_status(job_id, "analyzing")
@@ -100,8 +112,9 @@ def recover_interrupted_jobs() -> int:
 
 
 def _worker_loop(poll_interval: float = 10.0) -> None:
-    """Background thread that polls for pending jobs and processes them."""
-    while True:
+    """Background thread that polls for pending jobs and processes them.
+    Exits cleanly when _stop_event is set."""
+    while not _stop_event.is_set():
         try:
             counts = process_pending_jobs()
             if counts["processed"] > 0:
@@ -109,12 +122,20 @@ def _worker_loop(poll_interval: float = 10.0) -> None:
                          counts["processed"], counts["complete"], counts["failed"])
         except Exception:
             log.exception("Worker error during job processing")
-        time.sleep(poll_interval)
+        # Use Event.wait() so shutdown wakes the thread immediately
+        _stop_event.wait(timeout=poll_interval)
+    log.info("Background job worker stopped")
 
 
 def start_worker(poll_interval: float = 10.0) -> threading.Thread:
     """Start the background job worker thread."""
-    t = threading.Thread(target=_worker_loop, args=(poll_interval,), daemon=True)
+    _stop_event.clear()
+    t = threading.Thread(target=_worker_loop, args=(poll_interval,), daemon=True, name="poko-worker")
     t.start()
     log.info("Background job worker started (poll every %.0fs)", poll_interval)
     return t
+
+
+def stop_worker() -> None:
+    """Signal the background worker to stop and return immediately."""
+    _stop_event.set()
