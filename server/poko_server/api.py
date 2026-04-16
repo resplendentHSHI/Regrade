@@ -7,9 +7,11 @@ import time
 import logging
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from poko_server import config, db
 from poko_server.auth import get_current_user_email
+from poko_server.metrics import process_score_sync
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +104,24 @@ def job_result(job_id: str, email: str = Depends(get_current_user_email)):
         raise HTTPException(status_code=409, detail=f"Job is still {job['status']}")
     return {"job_id": job_id, "status": job["status"],
             "result_json": job["result_json"], "draft_md": job["draft_md"]}
+
+
+class ScoreEntry(BaseModel):
+    course_id: str
+    assignment_id: str
+    score: float
+    max_score: float
+
+
+class ScoreSyncRequest(BaseModel):
+    scores: list[ScoreEntry]
+
+
+@app.post("/scores/sync")
+def score_sync(body: ScoreSyncRequest, email: str = Depends(get_current_user_email)):
+    user = db.get_user_by_email(email)
+    result = process_score_sync(user["id"], [s.model_dump() for s in body.scores])
+    return result
 
 
 @app.delete("/jobs/{job_id}")
