@@ -39,6 +39,7 @@ def get_current_user_email(authorization: str = Header(...)) -> str:
     Raises 401 on invalid token.
     """
     if not authorization.startswith("Bearer "):
+        log.warning("Auth failure: missing Bearer prefix")
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = authorization[len("Bearer "):]
@@ -48,6 +49,7 @@ def get_current_user_email(authorization: str = Header(...)) -> str:
     else:
         email = verify_google_token(token)
         if email is None:
+            log.warning("Auth failure: invalid or expired token (first 8 chars: %s...)", token[:8])
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user = db.get_user_by_email(email)

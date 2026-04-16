@@ -238,12 +238,14 @@ def analyze_job(job_id: str, job_dir: Path) -> dict[str, Any]:
         }
 
     if result.returncode != 0:
+        log.error("Claude analysis failed for job %s (exit %d): %s",
+                  job_id, result.returncode, result.stderr[:500])
         return {
             "status": "failed",
             "result_json": None,
             "draft_md": None,
             "kept_issue_count": 0,
-            "error": f"claude -p exit {result.returncode}: {result.stderr[:1000]}",
+            "error": f"Analysis failed (exit code {result.returncode})",
         }
 
     analysis_path = job_dir / "analysis.json"
