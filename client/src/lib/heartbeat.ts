@@ -27,10 +27,13 @@ export async function runHeartbeat(
     const dataDir = `${appData}poko/pdfs`;
 
     const assignments = await store.getAssignments();
-    const existingHashes = assignments.filter((a) => a.pdfHash).map((a) => a.pdfHash!);
+    // Pass already-processed assignment IDs so the sidecar skips them
+    const alreadyProcessedIds = assignments.map(
+      (a) => `${a.courseId}_${a.assignmentId}`
+    );
 
     // 1. Fetch new graded PDFs + scores from Gradescope
-    const result = await sidecar.fetchGraded(gsEmail, gsPassword, enabledIds, dataDir, existingHashes);
+    const result = await sidecar.fetchGraded(gsEmail, gsPassword, enabledIds, dataDir, alreadyProcessedIds);
 
     // 2. Add new items to local assignments
     const courseMap = new Map(courses.map((c) => [c.id, c.name]));

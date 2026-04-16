@@ -9,6 +9,7 @@ import logging
 from collections import defaultdict
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from poko_server import config, db
@@ -19,6 +20,15 @@ from poko_server.metrics import process_score_sync
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="Poko Server", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Tauri webview origin varies; allow all for now
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 _start_time = time.monotonic()
 
 # ── In-memory rate limiting ────────────────────────────────────────────

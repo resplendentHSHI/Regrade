@@ -19,7 +19,6 @@ async function runSidecar(args: string[]): Promise<SidecarResponse> {
     }
     return { ok: false, error: output.stderr || "No output from sidecar" };
   } catch (err) {
-    // Surface the actual error from Tauri/shell plugin
     const msg = err instanceof Error ? err.message : String(err);
     console.error("Sidecar invocation failed:", msg);
     return { ok: false, error: `Sidecar error: ${msg}` };
@@ -38,12 +37,12 @@ export async function fetchCourses(email: string, password: string) {
 
 export async function fetchGraded(
   email: string, password: string, courseIds: string[],
-  dataDir: string, existingHashes: string[] = [],
+  dataDir: string, alreadyProcessedIds: string[] = [],
 ) {
   const resp = await runSidecar([
     "fetch", email, password,
     JSON.stringify(courseIds), dataDir,
-    JSON.stringify(existingHashes),
+    JSON.stringify(alreadyProcessedIds),
   ]);
   if (!resp.ok) throw new Error(resp.error || "Failed to fetch");
   return resp as { ok: boolean; items: unknown[]; scores: unknown[] };
@@ -53,4 +52,27 @@ export async function fetchUpcoming(email: string, password: string, courseIds: 
   const resp = await runSidecar(["upcoming", email, password, JSON.stringify(courseIds)]);
   if (!resp.ok) throw new Error(resp.error || "Failed to fetch upcoming");
   return resp.assignments as Array<{ name: string; dueDate: string; courseId: string; assignmentId: string; type: string }>;
+}
+
+export async function listGraded(email: string, password: string, courseIds: string[]) {
+  const resp = await runSidecar(["list_graded", email, password, JSON.stringify(courseIds)]);
+  if (!resp.ok) throw new Error(resp.error || "Failed to list graded");
+  return resp.assignments as Array<{
+    course_id: string; assignment_id: string; submission_id: string;
+    name: string; score: number | null; max_score: number | null;
+    due_date: string | null; type: string;
+  }>;
+}
+
+export async function fetchSpecific(
+  email: string, password: string,
+  assignments: Array<{ course_id: string; assignment_id: string; submission_id: string; name: string; score: number | null; max_score: number | null; due_date: string | null; type: string }>,
+  dataDir: string,
+) {
+  const resp = await runSidecar([
+    "fetch_specific", email, password,
+    JSON.stringify(assignments), dataDir,
+  ]);
+  if (!resp.ok) throw new Error(resp.error || "Failed to fetch specific");
+  return resp as { ok: boolean; items: unknown[] };
 }
