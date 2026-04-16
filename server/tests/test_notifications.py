@@ -58,16 +58,20 @@ def test_build_email_body():
     assert "MATH 268" in body
 
 
-def test_send_notification_calls_smtp():
-    with patch("poko_server.notifications.smtplib.SMTP") as mock_smtp_class:
-        mock_smtp = MagicMock()
-        mock_smtp_class.return_value.__enter__ = MagicMock(return_value=mock_smtp)
-        mock_smtp_class.return_value.__exit__ = MagicMock(return_value=False)
+def test_send_notification_calls_resend():
+    with patch("poko_server.notifications.resend.Emails.send") as mock_send, \
+         patch("poko_server.notifications.config.RESEND_API_KEY", "re_test_key"), \
+         patch("poko_server.notifications.config.NOTIFICATION_FROM_EMAIL", "Poko <test@resend.dev>"):
+        send_notification("alice@gmail.com", "Test Subject", "Test body")
 
-        with patch("poko_server.notifications.config.NOTIFICATION_EMAIL", "bot@test.com"), \
-             patch("poko_server.notifications.config.NOTIFICATION_EMAIL_PASSWORD", "pass123"), \
-             patch("poko_server.notifications.config.SMTP_HOST", "smtp.test.com"), \
-             patch("poko_server.notifications.config.SMTP_PORT", 587):
-            send_notification("alice@gmail.com", "Test Subject", "Test body")
+    mock_send.assert_called_once()
+    call_args = mock_send.call_args[0][0]
+    assert call_args["to"] == ["alice@gmail.com"]
+    assert call_args["subject"] == "Test Subject"
+    assert call_args["text"] == "Test body"
 
-        mock_smtp.sendmail.assert_called_once()
+
+def test_send_notification_skips_when_no_key():
+    with patch("poko_server.notifications.config.RESEND_API_KEY", ""):
+        result = send_notification("alice@gmail.com", "Test", "Body")
+    assert result is False

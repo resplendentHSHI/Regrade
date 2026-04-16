@@ -1,10 +1,10 @@
-"""Email notifications for critical regrade findings."""
+"""Email notifications for critical regrade findings via Resend."""
 from __future__ import annotations
 
 import json
 import logging
-import smtplib
-from email.message import EmailMessage
+
+import resend
 
 from poko_server import config
 
@@ -51,20 +51,19 @@ def build_email_body(user_email, assignment_name, course_name, result_json):
 
 
 def send_notification(to_email, subject, body):
-    """Send an email via SMTP. Returns True on success."""
-    if not config.NOTIFICATION_EMAIL or not config.NOTIFICATION_EMAIL_PASSWORD:
-        log.warning("Notification email not configured; skipping send")
+    """Send an email via Resend. Returns True on success."""
+    if not config.RESEND_API_KEY:
+        log.warning("RESEND_API_KEY not configured; skipping send")
         return False
-    msg = EmailMessage()
-    msg["From"] = config.NOTIFICATION_EMAIL
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.set_content(body)
+
+    resend.api_key = config.RESEND_API_KEY
     try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as smtp:
-            smtp.starttls()
-            smtp.login(config.NOTIFICATION_EMAIL, config.NOTIFICATION_EMAIL_PASSWORD)
-            smtp.sendmail(config.NOTIFICATION_EMAIL, to_email, msg.as_string())
+        resend.Emails.send({
+            "from": config.NOTIFICATION_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "text": body,
+        })
         log.info("Notification sent to %s: %s", to_email, subject)
         return True
     except Exception:

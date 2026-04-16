@@ -36,10 +36,8 @@ CLAUDE_PRESCREEN_MAX_BUDGET_USD = 0.50
 CLAUDE_PRESCREEN_TIMEOUT_SEC = 300
 
 # ── Notifications ──────────────────────────────────────────────────────
-NOTIFICATION_EMAIL = os.environ.get("NOTIFICATION_EMAIL", "")
-NOTIFICATION_EMAIL_PASSWORD = os.environ.get("NOTIFICATION_EMAIL_PASSWORD", "")
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+NOTIFICATION_FROM_EMAIL = os.environ.get("NOTIFICATION_FROM_EMAIL", "Poko <onboarding@resend.dev>")
 
 # ── Rate limits ────────────────────────────────────────────────────────
 MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
