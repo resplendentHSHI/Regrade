@@ -1,3 +1,4 @@
+import { appDataDir } from "@tauri-apps/api/path";
 import * as sidecar from "./sidecar";
 import * as api from "./api";
 import * as store from "./store";
@@ -22,8 +23,8 @@ export async function runHeartbeat(
       return;
     }
 
-    // Use a temp dir for PDF downloads — in production use appDataDir
-    const dataDir = "/tmp/poko_pdfs";
+    const appData = await appDataDir();
+    const dataDir = `${appData}poko/pdfs`;
 
     const assignments = await store.getAssignments();
     const existingHashes = assignments.filter((a) => a.pdfHash).map((a) => a.pdfHash!);

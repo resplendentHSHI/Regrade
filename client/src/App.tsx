@@ -110,8 +110,8 @@ export default function App() {
     };
   }, [onboarded, token]);
 
-  // Step 1: Sign in
-  if (!token || token === "dev-token-placeholder") {
+  // Step 1: Sign in (skip if we already have a real token)
+  if (!token) {
     return <SignInScreen onSignIn={() => setToken(getStoredToken())} />;
   }
 

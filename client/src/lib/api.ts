@@ -1,10 +1,24 @@
+import { refreshAccessToken } from "./auth";
+
 const SERVER_URL = "https://tp64.tailf28040.ts.net";
 
 async function request(path: string, options: RequestInit & { token?: string } = {}): Promise<Response> {
   const { token, ...fetchOpts } = options;
   const headers: Record<string, string> = { ...(fetchOpts.headers as Record<string, string>) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(`${SERVER_URL}${path}`, { ...fetchOpts, headers });
+
+  let resp = await fetch(`${SERVER_URL}${path}`, { ...fetchOpts, headers });
+
+  // Auto-refresh on 401
+  if (resp.status === 401 && token) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      resp = await fetch(`${SERVER_URL}${path}`, { ...fetchOpts, headers });
+    }
+  }
+
+  return resp;
 }
 
 export async function verifyAuth(token: string) {

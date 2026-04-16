@@ -10,18 +10,24 @@ import {
   getCredentials,
   saveCredentials,
 } from "@/lib/store";
-import { signOut } from "@/lib/auth";
+import { signOut, getStoredToken } from "@/lib/auth";
+import * as api from "@/lib/api";
 import type { Course } from "@/lib/types";
 
 export function Settings() {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [email, setEmail] = useState("");
+  const [gsEmail, setGsEmail] = useState("");
+  const [googleEmail, setGoogleEmail] = useState("");
   const [notifications, setNotifications] = useState(true);
 
   useEffect(() => {
     getCourses().then(setCourses);
-    getCredentials().then((c) => setEmail(c.gsEmail));
+    getCredentials().then((c) => setGsEmail(c.gsEmail));
     getSettings().then((s) => setNotifications(s.notificationsEnabled));
+    const token = getStoredToken();
+    if (token) {
+      api.getUserStats(token).then((s) => setGoogleEmail(s.email)).catch(() => {});
+    }
   }, []);
 
   const toggleCourse = async (courseId: string) => {
@@ -103,7 +109,7 @@ export function Settings() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm">Connected as</p>
-              <p className="text-sm font-medium">{email || "Not connected"}</p>
+              <p className="text-sm font-medium">{gsEmail || "Not connected"}</p>
             </div>
             <Button variant="outline" size="sm">
               Update Credentials
@@ -169,7 +175,16 @@ export function Settings() {
         <CardHeader>
           <CardTitle>Account</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Signed in as</p>
+            <p className="text-sm font-medium">{googleEmail || "Unknown"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Gradescope account</p>
+            <p className="text-sm font-medium">{gsEmail || "Not connected"}</p>
+          </div>
+          <Separator />
           <Button variant="destructive" onClick={handleSignOut}>
             Sign Out
           </Button>
