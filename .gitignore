@@ -28,3 +28,4 @@ gradescope-api/
 # Claude Code project state
 .claude/
 server/.env
+client/.env
