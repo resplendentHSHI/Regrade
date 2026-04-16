@@ -47,6 +47,9 @@ JOBS_PER_USER_PER_DAY = 50
 REQUESTS_PER_USER_PER_HOUR = 100
 JOB_RESULT_RETENTION_DAYS = 7
 
+# ── Admin ──────────────────────────────────────────────────────────────
+ADMIN_SECRET = os.environ.get("POKO_ADMIN_SECRET", "")
+
 # ── Server ─────────────────────────────────────────────────────────────
 SERVER_HOST = os.environ.get("SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.environ.get("SERVER_PORT", "8080"))

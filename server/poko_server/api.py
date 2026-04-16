@@ -61,8 +61,11 @@ def health():
 
 
 @app.get("/admin/stats")
-def admin_stats():
-    """Server-wide analytics. No auth required (admin only by network access)."""
+def admin_stats(request: Request):
+    """Server-wide analytics. Protected by admin secret in query param."""
+    admin_secret = config.ADMIN_SECRET
+    if not admin_secret or request.query_params.get("secret") != admin_secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
     stats = db.get_server_stats()
     stats["uptime_seconds"] = round(time.monotonic() - _start_time, 1)
     return stats
@@ -100,6 +103,8 @@ def upload_job(
     content = file.file.read()
     if len(content) > config.MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="File too large (max 50 MB)")
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Invalid PDF file (bad magic bytes)")
     pdf_hash = hashlib.sha256(content).hexdigest()
     user = db.get_user_by_email(email)
     job = db.create_job(user_id=user["id"], pdf_hash=pdf_hash, course_id=course_id,
