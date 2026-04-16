@@ -1,5 +1,6 @@
 import { BaseDirectory, mkdir, readTextFile, writeTextFile, exists } from "@tauri-apps/plugin-fs";
 import type { Assignment, Course, ActivityEntry, HeartbeatState, UpcomingAssignment } from "./types";
+import type { Pet } from "./pet";
 
 const STORE_DIR = "poko";
 
@@ -63,3 +64,7 @@ export async function removeAssignment(courseId: string, assignmentId: string) {
 interface Credentials { gsEmail: string; gsPassword: string; }
 export const getCredentials = () => readJson<Credentials>("credentials.json", { gsEmail: "", gsPassword: "" });
 export const saveCredentials = (c: Credentials) => writeJson("credentials.json", c);
+
+// ── Pet companion ─────────────────────────────────────────────────────────
+export const getPet = () => readJson<Pet | null>("pet.json", null);
+export const savePet = (pet: Pet) => writeJson("pet.json", pet);

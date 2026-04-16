@@ -95,29 +95,45 @@ export function Home({ token }: HomeProps) {
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8">
       {/* Hero stat */}
-      <Card>
-        <CardContent className="pt-2 pb-2 text-center">
-          <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">Points Recovered</p>
-          <p className="text-6xl font-bold tracking-tight mt-2">{stats.pointsRecovered}</p>
-          <p className="text-sm text-muted-foreground mt-2">across all your courses</p>
+      <Card className="relative overflow-hidden rounded-3xl border-primary/20">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-70"
+          style={{
+            background:
+              "radial-gradient(ellipse 500px 250px at 50% 0%, oklch(0.92 0.06 10 / 0.6), transparent 70%)",
+          }}
+        />
+        <CardContent className="pt-4 pb-6 text-center relative">
+          <p className="text-[11px] font-medium text-muted-foreground tracking-[0.2em] uppercase">
+            Points Recovered
+          </p>
+          <p
+            className="font-heading mt-3 leading-none tabular-nums"
+            style={{ fontSize: "6rem", fontWeight: 500, letterSpacing: "-0.03em" }}
+          >
+            {stats.pointsRecovered}
+          </p>
+          <p className="display-italic text-sm text-muted-foreground mt-3">
+            across all your courses
+          </p>
           {serverOffline && (
-            <p className="text-xs text-muted-foreground mt-1">Server offline — stats unavailable</p>
+            <p className="text-xs text-muted-foreground/70 mt-2">· server offline ·</p>
           )}
         </CardContent>
       </Card>
 
       {/* Supporting stats */}
       <div className="grid grid-cols-2 gap-4">
-        <Card size="sm">
-          <CardContent className="text-center">
-            <p className="text-3xl font-semibold">{stats.pagesReviewed}</p>
-            <p className="text-sm text-muted-foreground">Pages Reviewed</p>
+        <Card size="sm" className="rounded-2xl border-secondary/40">
+          <CardContent className="text-center py-4">
+            <p className="text-3xl font-heading font-medium tabular-nums">{stats.pagesReviewed}</p>
+            <p className="text-xs text-muted-foreground tracking-wide mt-1">pages reviewed</p>
           </CardContent>
         </Card>
-        <Card size="sm">
-          <CardContent className="text-center">
-            <p className="text-3xl font-semibold">{stats.assignmentsAnalyzed}</p>
-            <p className="text-sm text-muted-foreground">Assignments Analyzed</p>
+        <Card size="sm" className="rounded-2xl border-accent/50">
+          <CardContent className="text-center py-4">
+            <p className="text-3xl font-heading font-medium tabular-nums">{stats.assignmentsAnalyzed}</p>
+            <p className="text-xs text-muted-foreground tracking-wide mt-1">assignments analyzed</p>
           </CardContent>
         </Card>
       </div>
