@@ -27,13 +27,19 @@ export async function runHeartbeat(
     const dataDir = `${appData}poko/pdfs`;
 
     const assignments = await store.getAssignments();
-    // Pass already-processed assignment IDs so the sidecar skips them
     const alreadyProcessedIds = assignments.map(
       (a) => `${a.courseId}_${a.assignmentId}`
     );
 
-    // 1. Fetch new graded PDFs + scores from Gradescope
-    const result = await sidecar.fetchGraded(gsEmail, gsPassword, enabledIds, dataDir, alreadyProcessedIds);
+    // First run (no assignments yet): backfill 30 days.
+    // Subsequent runs: download ALL newly graded (no date limit).
+    const isFirstRun = assignments.length === 0;
+    const backfillDays = isFirstRun ? 30 : undefined;
+
+    // 1. Fetch graded PDFs + scores from Gradescope
+    const result = await sidecar.fetchGraded(
+      gsEmail, gsPassword, enabledIds, dataDir, alreadyProcessedIds, backfillDays,
+    );
 
     // 2. Add new items to local assignments
     const courseMap = new Map(courses.map((c) => [c.id, c.name]));

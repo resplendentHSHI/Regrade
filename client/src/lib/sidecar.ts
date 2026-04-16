@@ -38,12 +38,17 @@ export async function fetchCourses(email: string, password: string) {
 export async function fetchGraded(
   email: string, password: string, courseIds: string[],
   dataDir: string, alreadyProcessedIds: string[] = [],
+  backfillDays?: number,
 ) {
-  const resp = await runSidecar([
+  const args = [
     "fetch", email, password,
     JSON.stringify(courseIds), dataDir,
     JSON.stringify(alreadyProcessedIds),
-  ]);
+  ];
+  if (backfillDays !== undefined) {
+    args.push(String(backfillDays));
+  }
+  const resp = await runSidecar(args);
   if (!resp.ok) throw new Error(resp.error || "Failed to fetch");
   return resp as { ok: boolean; items: unknown[]; scores: unknown[] };
 }

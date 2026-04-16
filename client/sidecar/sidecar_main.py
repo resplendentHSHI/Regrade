@@ -83,19 +83,26 @@ def cmd_upcoming(args: list[str]) -> None:
 
 
 def cmd_fetch(args: list[str]) -> None:
-    """Fetch all graded PDFs not yet processed.
+    """Fetch graded PDFs not yet processed.
 
-    Args[4] is a JSON list of already-processed "{course_id}_{assignment_id}" strings.
+    Args:
+      0: email
+      1: password
+      2: course_ids_json
+      3: data_dir
+      4: already_processed_ids_json (optional, default "[]")
+      5: backfill_days (optional, e.g. "30" for initial backfill)
     """
     if len(args) < 4:
-        _out({"ok": False, "error": "Usage: fetch <email> <password> <course_ids_json> <data_dir> [already_processed_ids_json]"})
+        _out({"ok": False, "error": "Usage: fetch <email> <password> <course_ids_json> <data_dir> [already_processed_ids_json] [backfill_days]"})
         return
     already_processed_json = args[4] if len(args) > 4 else "[]"
+    backfill_days = int(args[5]) if len(args) > 5 else None
     try:
         course_ids = json.loads(args[2])
         already_processed = json.loads(already_processed_json)
         client = _login_client(args[0], args[1])
-        result = fetch_graded(client, course_ids, args[3], already_processed)
+        result = fetch_graded(client, course_ids, args[3], already_processed, backfill_days)
         _out({"ok": True, "items": result["items"], "scores": result["scores"]})
     except Exception as e:
         log.error("fetch failed: %s", e)

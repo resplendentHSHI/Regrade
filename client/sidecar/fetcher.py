@@ -146,26 +146,27 @@ def fetch_graded(
     course_ids: list[str],
     data_dir: str | Path,
     already_processed_ids: list[str] | None = None,
+    backfill_days: int | None = None,
     now_local: Callable[[], datetime] = lambda: datetime.now().astimezone(),
 ) -> dict:
-    """Download ALL graded PDFs that haven't been processed yet.
+    """Download graded PDFs that haven't been processed yet.
 
-    Unlike the old version, this does NOT filter by due date. Instead it
-    skips assignments whose {course_id}_{assignment_id} is in
-    already_processed_ids. This catches exams, late-graded HWs, etc.
-
-    Args:
-        client: Logged-in GSClient.
-        course_ids: Course IDs to scan.
-        data_dir: Directory to write PDFs into.
-        already_processed_ids: List of "{course_id}_{assignment_id}" strings
-            for assignments already downloaded/analyzed. These are skipped.
+    Behavior:
+      - Always skips assignments in already_processed_ids.
+      - If backfill_days is set (e.g., 30 for initial backfill), also filters
+        to assignments with due_date in the last N days OR due_date=None
+        (exams, etc.). This prevents downloading an entire semester of old HWs.
+      - If backfill_days is None (normal heartbeat), downloads ALL graded
+        assignments not yet processed — catches newly graded items regardless
+        of when they were due.
 
     Returns:
         {"items": [...], "scores": [...]}
     """
     processed_set = set(already_processed_ids or [])
     data_dir = Path(data_dir)
+    now = now_local()
+    cutoff = (now - timedelta(days=backfill_days)) if backfill_days else None
     items = []
     scores = []
 
@@ -196,6 +197,12 @@ def fetch_graded(
             # Skip already-processed assignments
             if item_id in processed_set:
                 log.debug("Skipping already-processed %s (%s)", item_id, row.name)
+                continue
+
+            # For backfill: only include items with recent due dates or no due date
+            if cutoff is not None and row.due_date is not None and row.due_date < cutoff:
+                log.debug("Skipping %s (%s): due %s before backfill cutoff",
+                          item_id, row.name, row.due_date.isoformat())
                 continue
 
             # Download the PDF
