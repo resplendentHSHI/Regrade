@@ -195,6 +195,7 @@ def analyze_job(job_id: str, job_dir: Path) -> dict[str, Any]:
             "result_json": json.dumps(no_issues_verdict),
             "draft_md": None,
             "kept_issue_count": 0,
+            "pages_counted": pages,
             "error": None,
         }
 
@@ -278,5 +279,6 @@ def analyze_job(job_id: str, job_dir: Path) -> dict[str, Any]:
         "result_json": analysis_path.read_text(encoding="utf-8"),
         "draft_md": draft_md,
         "kept_issue_count": kept,
+        "pages_counted": pages,
         "error": None,
     }

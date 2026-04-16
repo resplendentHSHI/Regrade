@@ -31,7 +31,6 @@ def build_email_body(user_email, assignment_name, course_name, result_json):
         if i.get("keep") and i.get("confidence_tier") == "critical"
     ]
     lines = [
-        f"Subject: Poko found an obvious grading error in {assignment_name}", "",
         "Hi,", "",
         "Poko reviewed your graded assignments and found something that looks like a clear mistake:", "",
     ]

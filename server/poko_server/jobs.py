@@ -42,6 +42,11 @@ def process_pending_jobs() -> dict[str, int]:
         counters["processed"] += 1
         if result["status"] == "complete":
             counters["complete"] += 1
+            db.update_user_metrics(
+                job["user_id"],
+                assignments_analyzed_delta=1,
+                pages_reviewed_delta=result.get("pages_counted", 0),
+            )
             # Send notification for critical findings
             if result.get("result_json") and should_notify(result["result_json"]):
                 user = db.get_user_by_id(job["user_id"])

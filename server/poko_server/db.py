@@ -2,39 +2,41 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from poko_server import config
 
-_connection: Optional[sqlite3.Connection] = None
+_local = threading.local()
 
 
 def get_connection() -> sqlite3.Connection:
-    """Return (and cache) a SQLite connection to the configured DB path."""
-    global _connection
-    if _connection is None:
-        _connection = sqlite3.connect(str(config.DB_PATH), check_same_thread=False)
-        _connection.row_factory = sqlite3.Row
-        _connection.execute("PRAGMA journal_mode=WAL")
-        _connection.execute("PRAGMA foreign_keys=ON")
-    return _connection
+    """Return a per-thread SQLite connection to the configured DB path."""
+    if not hasattr(_local, "connection") or _local.connection is None:
+        config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(config.DB_PATH), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        _local.connection = conn
+    return _local.connection
 
 
 def close_connection() -> None:
-    """Close and reset the module-level connection."""
-    global _connection
-    if _connection is not None:
-        try:
-            _connection.close()
-        except Exception:
-            pass
-        _connection = None
+    """Close and reset the per-thread connection."""
+    if hasattr(_local, "connection") and _local.connection is not None:
+        _local.connection.close()
+        _local.connection = None
 
 
-def _now() -> str:
+def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# Keep backward-compatible alias
+_now = _now_iso
 
 
 def create_tables() -> None:
@@ -42,15 +44,20 @@ def create_tables() -> None:
     conn = get_connection()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS users (
-            id       TEXT PRIMARY KEY,
-            email    TEXT UNIQUE NOT NULL,
-            created_at TEXT NOT NULL
+            id                 TEXT PRIMARY KEY,
+            email              TEXT UNIQUE NOT NULL,
+            created_at         TEXT NOT NULL,
+            notification_prefs TEXT DEFAULT 'on'
         );
 
         CREATE TABLE IF NOT EXISTS courses (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            created_at  TEXT NOT NULL
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT NOT NULL REFERENCES users(id),
+            course_id   TEXT NOT NULL,
+            course_name TEXT NOT NULL,
+            enabled     INTEGER DEFAULT 1,
+            policy_ack_at TEXT,
+            UNIQUE(user_id, course_id)
         );
 
         CREATE TABLE IF NOT EXISTS jobs (
@@ -92,20 +99,17 @@ def create_tables() -> None:
 
 # ── Users ──────────────────────────────────────────────────────────────────────
 
-def create_user(email: str) -> dict:
+def create_user(email: str) -> dict[str, Any]:
     """Insert a user (idempotent) and return the user row as a dict."""
     conn = get_connection()
-    existing = get_user_by_email(email)
-    if existing:
-        return existing
     user_id = uuid.uuid4().hex
-    now = _now()
+    now = _now_iso()
     conn.execute(
-        "INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO users (id, email, created_at) VALUES (?, ?, ?)",
         (user_id, email, now),
     )
     conn.execute(
-        "INSERT INTO metrics (user_id) VALUES (?)",
+        "INSERT OR IGNORE INTO metrics (user_id) VALUES (?)",
         (user_id,),
     )
     conn.commit()

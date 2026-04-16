@@ -37,11 +37,22 @@ def test_score_sync_no_prior_scores(client, auth_headers, db_conn):
     assert data["changes_detected"] == 0
 
 
-def test_score_sync_detects_increase(client, auth_headers, db_conn):
+def test_score_sync_detects_increase_with_job(client, auth_headers, db_conn):
+    """Score increases are only credited when a completed Poko job exists."""
+    from poko_server import db as poko_db
     with _mock_auth():
+        # Establish baseline score
         client.post("/scores/sync", headers=auth_headers,
             json={"scores": [{"course_id": "1001", "assignment_id": "2001",
                               "score": 85.0, "max_score": 100.0}]})
+        # Create a completed job for this assignment
+        user = poko_db.get_user_by_email("test@gmail.com")
+        job = poko_db.create_job(
+            user_id=user["id"], pdf_hash="testhash", course_id="1001",
+            assignment_id="2001", assignment_name="HW1", course_name="MATH 101",
+        )
+        poko_db.update_job_status(job["id"], "complete")
+        # Sync with higher score
         resp = client.post("/scores/sync", headers=auth_headers,
             json={"scores": [{"course_id": "1001", "assignment_id": "2001",
                               "score": 90.0, "max_score": 100.0}]})
@@ -51,11 +62,36 @@ def test_score_sync_detects_increase(client, auth_headers, db_conn):
     assert data["total_points_delta"] == 5.0
 
 
-def test_stats_reflect_score_changes(client, auth_headers, db_conn):
+def test_score_sync_no_credit_without_job(client, auth_headers, db_conn):
+    """Score increases are NOT credited when no Poko job exists."""
     with _mock_auth():
         client.post("/scores/sync", headers=auth_headers,
             json={"scores": [{"course_id": "1001", "assignment_id": "2001",
                               "score": 85.0, "max_score": 100.0}]})
+        resp = client.post("/scores/sync", headers=auth_headers,
+            json={"scores": [{"course_id": "1001", "assignment_id": "2001",
+                              "score": 90.0, "max_score": 100.0}]})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["changes_detected"] == 0
+    assert data["total_points_delta"] == 0.0
+
+
+def test_stats_reflect_score_changes(client, auth_headers, db_conn):
+    from poko_server import db as poko_db
+    with _mock_auth():
+        # Establish baseline
+        client.post("/scores/sync", headers=auth_headers,
+            json={"scores": [{"course_id": "1001", "assignment_id": "2001",
+                              "score": 85.0, "max_score": 100.0}]})
+        # Create completed job so increase is attributed to Poko
+        user = poko_db.get_user_by_email("test@gmail.com")
+        job = poko_db.create_job(
+            user_id=user["id"], pdf_hash="statshash", course_id="1001",
+            assignment_id="2001", assignment_name="HW1", course_name="MATH 101",
+        )
+        poko_db.update_job_status(job["id"], "complete")
+        # Sync with higher score
         client.post("/scores/sync", headers=auth_headers,
             json={"scores": [{"course_id": "1001", "assignment_id": "2001",
                               "score": 90.0, "max_score": 100.0}]})

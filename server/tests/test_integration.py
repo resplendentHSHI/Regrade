@@ -78,7 +78,7 @@ def test_full_flow(client, db_conn, tmp_data_dir):
 
 
 def test_score_sync_flow(client, db_conn, tmp_data_dir):
-    """Sync scores twice, verify increase detection and metrics."""
+    """Sync scores twice with a completed job, verify increase detection and metrics."""
     headers = {"Authorization": "Bearer test-token"}
 
     with _mock_auth():
@@ -86,6 +86,14 @@ def test_score_sync_flow(client, db_conn, tmp_data_dir):
         client.post("/scores/sync", headers=headers,
             json={"scores": [{"course_id": "1001", "assignment_id": "2001",
                               "score": 85.0, "max_score": 100.0}]})
+
+        # Create a completed job so the increase is attributed to Poko
+        user = db.get_user_by_email("integration@gmail.com")
+        job = db.create_job(
+            user_id=user["id"], pdf_hash="intghash", course_id="1001",
+            assignment_id="2001", assignment_name="HW1", course_name="MATH 101",
+        )
+        db.update_job_status(job["id"], "complete")
 
         # Second sync: score increased
         sync_resp = client.post("/scores/sync", headers=headers,
