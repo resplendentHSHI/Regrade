@@ -24,7 +24,8 @@ export async function runHeartbeat(
     }
 
     const appData = await appDataDir();
-    const dataDir = `${appData}poko/pdfs`;
+    const sep = appData.endsWith("/") || appData.endsWith("\\") ? "" : "/";
+    const dataDir = `${appData}${sep}poko/pdfs`;
 
     const assignments = await store.getAssignments();
     const alreadyProcessedIds = assignments.map(
