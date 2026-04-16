@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from poko_server import config, db
 from poko_server.analyzer import analyze_job
+from poko_server.notifications import should_notify, send_notification, build_email_body
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +40,19 @@ def process_pending_jobs() -> dict[str, int]:
         counters["processed"] += 1
         if result["status"] == "complete":
             counters["complete"] += 1
+            # Send notification for critical findings
+            if result.get("result_json") and should_notify(result["result_json"]):
+                user = db.get_user_by_id(job["user_id"])
+                if user:
+                    body = build_email_body(
+                        user["email"], job["assignment_name"],
+                        job["course_name"], result["result_json"],
+                    )
+                    send_notification(
+                        user["email"],
+                        f"Poko found an obvious grading error in {job['assignment_name']}",
+                        body,
+                    )
         else:
             counters["failed"] += 1
 

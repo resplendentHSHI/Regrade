@@ -122,3 +122,25 @@ def test_process_pending_job(db_conn, tmp_data_dir):
 def test_process_no_pending_jobs(db_conn, tmp_data_dir):
     counts = process_pending_jobs()
     assert counts["processed"] == 0
+
+
+def test_process_job_sends_notification_for_critical(db_conn, tmp_data_dir):
+    """When analysis finds critical issues, send_notification is called."""
+    from poko_server import config
+    user = db.create_user("notify-test@gmail.com")
+    job = db.create_job(user_id=user["id"], pdf_hash="notify123", course_id="1001",
+                        assignment_id="2001", assignment_name="HW7", course_name="MATH 268")
+    job_dir = config.UPLOAD_DIR / job["id"]
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "submission.pdf").write_bytes((FIXTURES / "sample.pdf").read_bytes())
+
+    with patch.object(config, "CLAUDE_PRESCREEN_BINARY", str(FIXTURES / "fake_prescreen_yes.sh")), \
+         patch.object(config, "CLAUDE_BINARY", str(FIXTURES / "fake_claude_ok.sh")), \
+         patch("poko_server.jobs.send_notification") as mock_send, \
+         patch("poko_server.jobs.should_notify", return_value=True):
+        process_pending_jobs()
+
+    mock_send.assert_called_once()
+    call_args = mock_send.call_args
+    assert call_args[0][0] == "notify-test@gmail.com"
+    assert "HW7" in call_args[0][1]
