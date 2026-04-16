@@ -1,8 +1,27 @@
-# Gradescope Regrade Bot
+# Poko — Your Grade Companion
 
-Personal bot that pulls graded assignments from Gradescope daily at 2 AM local time, analyzes them with Claude Code (`--effort max` on Opus) for reasonable regrade candidates, and serves a localhost dashboard for review.
+Poko is a macOS app that pulls your graded Gradescope assignments, analyzes them with AI for possible grading mistakes, and drafts paste-ready regrade requests. It comes with your own ASCII art pet 🥚
 
-**The bot never auto-submits regrade requests.** It only drafts them for you.
+**Poko never auto-submits regrade requests.** It only drafts them for you to review and send.
+
+## ⬇️ Download for Mac
+
+**[Download Poko for macOS (latest)](https://github.com/resplendentHSHI/Regrade/releases/download/latest-mac/Poko-mac.dmg)**
+
+This link always serves the most recent build from the main development branch. Just open the `.dmg`, drag **Poko** to your Applications folder, and launch.
+
+> On first open, macOS may ask you to allow the app (System Settings → Privacy & Security → "Open Anyway"). We're working on code-signing to remove this step.
+
+### What you need
+- A Mac running macOS 12 or later (Intel or Apple Silicon)
+- A Google account (for sign-in)
+- A Gradescope account with a direct password (not SSO-only)
+
+---
+
+## For developers — the personal regrade bot
+
+This repo also contains the original personal Python bot that predates Poko. Docs below are for running that directly.
 
 ## Setup
 
