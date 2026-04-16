@@ -230,7 +230,7 @@ function AddAssignmentDialog({
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 -mx-6 px-6">
+            <ScrollArea className="max-h-[50vh] -mx-6 px-6">
               <div className="space-y-4 pb-2">
                 {Object.entries(grouped).map(([courseId, courseItems]) => (
                   <div key={courseId}>

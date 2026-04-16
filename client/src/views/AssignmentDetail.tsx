@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Markdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +16,9 @@ import type { Assignment, Course } from "@/lib/types";
 interface IssueEntry {
   question?: string;
   category?: string;
-  confidence?: string;
-  pointsDisputed?: number;
-  summary?: string;
+  confidence_tier?: string;
+  points_disputed?: number;
+  reasoning?: string;
 }
 
 const CONFIDENCE_STYLES: Record<string, string> = {
@@ -24,12 +27,32 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   marginal: "bg-muted text-muted-foreground border-border",
 };
 
+function parseDraftSections(draft: string): Array<{ title: string; body: string; raw: string }> {
+  const sections: Array<{ title: string; body: string; raw: string }> = [];
+  const parts = draft.split(/(?=^## )/m);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    // Skip the top-level H1 header (starts with "# " but not "## ")
+    if (trimmed.startsWith("# ") && !trimmed.startsWith("## ")) continue;
+    if (!trimmed.startsWith("## ")) continue;
+    const firstNewline = trimmed.indexOf("\n");
+    const title =
+      firstNewline > 0
+        ? trimmed.slice(3, firstNewline).trim()
+        : trimmed.slice(3).trim();
+    const body = firstNewline > 0 ? trimmed.slice(firstNewline + 1).trim() : "";
+    sections.push({ title, body, raw: trimmed });
+  }
+  return sections;
+}
+
 export function AssignmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [courseName, setCourseName] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -57,15 +80,22 @@ export function AssignmentDetail() {
   }
 
   const issues: IssueEntry[] = assignment.resultJson
-    ? (() => { try { const parsed = JSON.parse(assignment.resultJson); return Array.isArray(parsed) ? parsed : parsed.issues || []; } catch { return []; } })()
+    ? (() => {
+        try {
+          const parsed = JSON.parse(assignment.resultJson);
+          return Array.isArray(parsed) ? parsed : parsed.issues || [];
+        } catch {
+          return [];
+        }
+      })()
     : [];
 
-  const handleCopy = async () => {
-    if (assignment.draftMd) {
-      await navigator.clipboard.writeText(assignment.draftMd);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const draftSections = assignment.draftMd ? parseDraftSections(assignment.draftMd) : [];
+
+  const handleCopySection = async (raw: string, idx: number) => {
+    await navigator.clipboard.writeText(raw);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
   };
 
   return (
@@ -102,11 +132,25 @@ export function AssignmentDetail() {
           </CardHeader>
           <CardContent>
             {assignment.pdfPath ? (
-              <iframe
-                src={convertFileSrc(assignment.pdfPath)}
-                className="w-full h-[600px] rounded-md border"
-                title="Assignment PDF"
-              />
+              <div className="space-y-3">
+                <object
+                  data={convertFileSrc(assignment.pdfPath)}
+                  type="application/pdf"
+                  className="w-full h-[600px] rounded-md border"
+                >
+                  <div className="flex flex-col items-center justify-center h-48 rounded-md border border-dashed text-muted-foreground gap-2">
+                    <p>PDF preview not available in this view</p>
+                    <a
+                      href={convertFileSrc(assignment.pdfPath)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline text-sm"
+                    >
+                      Open PDF
+                    </a>
+                  </div>
+                </object>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-48 rounded-md border border-dashed text-muted-foreground">
                 PDF not available
@@ -115,22 +159,42 @@ export function AssignmentDetail() {
           </CardContent>
         </Card>
 
-        {/* Right: Regrade draft */}
+        {/* Right: Regrade draft — per-question cards */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Regrade Draft</CardTitle>
-              {assignment.draftMd && (
-                <Button variant="outline" size="sm" onClick={handleCopy}>
-                  {copied ? "Copied!" : "Copy to Clipboard"}
-                </Button>
-              )}
-            </div>
+            <CardTitle>Regrade Draft</CardTitle>
           </CardHeader>
           <CardContent>
-            {assignment.draftMd ? (
+            {draftSections.length > 0 ? (
+              <div className="space-y-3">
+                {draftSections.map((section, i) => (
+                  <Card key={i} className="border-l-4 border-l-amber-400">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="font-semibold text-sm">{section.title}</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopySection(section.raw, i)}
+                        >
+                          {copiedIdx === i ? "Copied!" : "Copy"}
+                        </Button>
+                      </div>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {section.body}
+                        </Markdown>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : assignment.draftMd ? (
+              /* Fallback: draft exists but no ## sections parsed — render as plain markdown */
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <Markdown>{assignment.draftMd}</Markdown>
+                <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {assignment.draftMd}
+                </Markdown>
               </div>
             ) : (
               <div className="flex items-center justify-center h-48 rounded-md border border-dashed text-muted-foreground">
@@ -149,7 +213,7 @@ export function AssignmentDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             {issues.map((issue, i) => {
-              const confidence = issue.confidence?.toLowerCase() || "marginal";
+              const confidence = issue.confidence_tier?.toLowerCase() || "marginal";
               const styles = CONFIDENCE_STYLES[confidence] || CONFIDENCE_STYLES.marginal;
               return (
                 <div
@@ -160,17 +224,17 @@ export function AssignmentDetail() {
                     {issue.question && (
                       <p className="font-medium text-sm">{issue.question}</p>
                     )}
-                    {issue.summary && (
-                      <p className="text-sm mt-0.5 opacity-80">{issue.summary}</p>
+                    {issue.reasoning && (
+                      <p className="text-sm mt-0.5 opacity-80">{issue.reasoning}</p>
                     )}
                     {issue.category && (
                       <p className="text-xs mt-1 opacity-60">{issue.category}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {issue.pointsDisputed !== undefined && (
+                    {issue.points_disputed !== undefined && (
                       <span className="text-sm font-semibold tabular-nums">
-                        {issue.pointsDisputed} pts
+                        {issue.points_disputed} pts
                       </span>
                     )}
                     <Badge variant="outline" className="capitalize text-xs">
