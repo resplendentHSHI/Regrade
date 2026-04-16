@@ -9,6 +9,9 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     "fs:default",
-    "fs:allow-app-data-recursive"
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    "fs:allow-temp-read-recursive",
+    "fs:allow-temp-write-recursive"
   ]
 }
