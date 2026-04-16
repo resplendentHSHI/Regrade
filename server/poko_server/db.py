@@ -93,6 +93,14 @@ def create_tables() -> None:
             pages_reviewed       INTEGER NOT NULL DEFAULT 0,
             assignments_analyzed INTEGER NOT NULL DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS server_analytics (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type  TEXT NOT NULL,
+            user_id     TEXT,
+            detail      TEXT,
+            created_at  TEXT NOT NULL
+        );
     """)
     conn.commit()
 
@@ -285,3 +293,44 @@ def update_user_metrics(
          assignments_analyzed_delta, user_id),
     )
     conn.commit()
+
+
+# ── Server Analytics ───────────────────────────────────────────────────
+
+def log_event(event_type: str, user_id: str | None = None, detail: str = "") -> None:
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO server_analytics (event_type, user_id, detail, created_at) VALUES (?, ?, ?, ?)",
+        (event_type, user_id, detail, _now()),
+    )
+    conn.commit()
+
+
+def get_server_stats() -> dict[str, Any]:
+    """Aggregate server-wide analytics."""
+    conn = get_connection()
+    total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    total_jobs = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+    jobs_complete = conn.execute("SELECT COUNT(*) FROM jobs WHERE status = 'complete'").fetchone()[0]
+    jobs_failed = conn.execute("SELECT COUNT(*) FROM jobs WHERE status = 'failed'").fetchone()[0]
+    total_points = conn.execute("SELECT COALESCE(SUM(points_recovered), 0) FROM metrics").fetchone()[0]
+    total_pages = conn.execute("SELECT COALESCE(SUM(pages_reviewed), 0) FROM metrics").fetchone()[0]
+    total_analyzed = conn.execute("SELECT COALESCE(SUM(assignments_analyzed), 0) FROM metrics").fetchone()[0]
+    api_requests_today = conn.execute(
+        "SELECT COUNT(*) FROM server_analytics WHERE event_type = 'api_request' AND created_at >= date('now')"
+    ).fetchone()[0]
+    api_requests_total = conn.execute(
+        "SELECT COUNT(*) FROM server_analytics WHERE event_type = 'api_request'"
+    ).fetchone()[0]
+
+    return {
+        "total_users": total_users,
+        "total_jobs": total_jobs,
+        "jobs_complete": jobs_complete,
+        "jobs_failed": jobs_failed,
+        "total_points_recovered": total_points,
+        "total_pages_reviewed": total_pages,
+        "total_assignments_analyzed": total_analyzed,
+        "api_requests_today": api_requests_today,
+        "api_requests_total": api_requests_total,
+    }

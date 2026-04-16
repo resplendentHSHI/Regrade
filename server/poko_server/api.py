@@ -6,7 +6,7 @@ import shutil
 import time
 import logging
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from poko_server import config, db
@@ -39,12 +39,33 @@ def shutdown():
     db.close_connection()
 
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every API request for analytics."""
+    response = await call_next(request)
+    # Don't log health checks or admin stats to avoid noise
+    if request.url.path not in ("/health", "/admin/stats"):
+        try:
+            db.log_event("api_request", detail=f"{request.method} {request.url.path}")
+        except Exception:
+            pass  # Don't let analytics logging break requests
+    return response
+
+
 @app.get("/health")
 def health():
     return {
         "status": "ok",
         "uptime_seconds": round(time.monotonic() - _start_time, 1),
     }
+
+
+@app.get("/admin/stats")
+def admin_stats():
+    """Server-wide analytics. No auth required (admin only by network access)."""
+    stats = db.get_server_stats()
+    stats["uptime_seconds"] = round(time.monotonic() - _start_time, 1)
+    return stats
 
 
 @app.post("/auth/verify")
