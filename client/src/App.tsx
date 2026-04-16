@@ -1,51 +1,49 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Sidebar } from "./components/Sidebar";
+import { getSettings } from "./lib/store";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
+function Placeholder({ title }: { title: string }) {
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="p-8">
+      <h2 className="text-2xl font-bold">{title}</h2>
+      <p className="text-muted-foreground mt-2">Coming soon</p>
+    </div>
   );
 }
 
-export default App;
+export default function App() {
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getSettings().then((s) => setOnboarded(s.onboardingComplete));
+  }, []);
+
+  if (onboarded === null) return null;
+
+  if (!onboarded) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Placeholder title="Onboarding" />
+      </div>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <div className="flex h-screen">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<Placeholder title="Home" />} />
+            <Route path="/assignments" element={<Placeholder title="Assignments" />} />
+            <Route path="/assignments/:id" element={<Placeholder title="Assignment Detail" />} />
+            <Route path="/upcoming" element={<Placeholder title="Upcoming" />} />
+            <Route path="/settings" element={<Placeholder title="Settings" />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
