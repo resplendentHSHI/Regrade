@@ -204,20 +204,57 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
         {/* Step 1: Gradescope Credentials */}
         {step === 1 && (
-          <Card>
+          <Card className="rounded-3xl">
             <CardHeader>
-              <CardTitle className="text-lg">Connect Gradescope</CardTitle>
+              <CardTitle className="font-heading text-xl">Connect Gradescope</CardTitle>
               <CardDescription>
-                Enter your Gradescope credentials. They are stored securely on this device only.
+                Poko needs a Gradescope password login — not SSO — to pull your graded work.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Instructions — "use your own email, set a password" */}
+              <div className="rounded-2xl border border-accent/50 bg-accent/20 p-4 text-xs leading-relaxed space-y-2">
+                <p className="font-medium text-foreground text-sm">
+                  Important — use a personal email, not your school SSO
+                </p>
+                <p className="text-muted-foreground">
+                  If your school logs you in through SSO (Google, Shibboleth, Microsoft),
+                  Poko can't sign in with that. You'll need to link a personal email to your
+                  Gradescope account and set an explicit password. It takes about 2 minutes:
+                </p>
+                <ol className="list-decimal list-outside ml-4 space-y-1 text-muted-foreground">
+                  <li>
+                    Sign into Gradescope normally, then open{" "}
+                    <a
+                      href="https://www.gradescope.com/account/edit"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Account Settings
+                    </a>
+                  </li>
+                  <li>
+                    Add a <strong>personal email</strong> (e.g. Gmail) as a secondary email
+                  </li>
+                  <li>
+                    Click <strong>"Set a password"</strong> and pick something memorable
+                  </li>
+                  <li>
+                    Verify the email, then enter that email + password below
+                  </li>
+                </ol>
+                <p className="text-muted-foreground italic">
+                  Your credentials stay on this device — they never leave your Mac.
+                </p>
+              </div>
+
               <div className="space-y-2">
-                <Label htmlFor="gs-email">Email</Label>
+                <Label htmlFor="gs-email">Gradescope email</Label>
                 <Input
                   id="gs-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="your.personal@gmail.com"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setLoginOk(false); setLoginError(""); }}
                   autoFocus
@@ -228,7 +265,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <Input
                   id="gs-password"
                   type="password"
-                  placeholder="Your Gradescope password"
+                  placeholder="The password you set on Gradescope"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setLoginOk(false); setLoginError(""); }}
                 />

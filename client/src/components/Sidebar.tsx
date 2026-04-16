@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Home, ListTodo, FileText, Calendar, Settings } from "lucide-react";
+import { Home, ListTodo, FileText, Calendar, Settings, MessageCircleHeart } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Egg } from "./Egg";
 import { PetCompanion } from "./Pet";
 import { getPet, getAssignments } from "@/lib/store";
@@ -159,6 +160,22 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Feedback link */}
+      <div className="relative px-3 pb-2">
+        <button
+          onClick={() =>
+            openUrl(
+              "https://docs.google.com/forms/d/e/1FAIpQLSd5Y8XbEvwBMI7QUmDpcac6Ksy7FZUr-0cmikN0iBewM-GjmQ/viewform?usp=publish-editor"
+            )
+          }
+          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm w-full text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
+        >
+          <MessageCircleHeart className="h-4 w-4" strokeWidth={1.75} />
+          <span>Feedback</span>
+          <span className="ml-auto text-muted-foreground/50 text-[10px]">↗</span>
+        </button>
+      </div>
 
       {/* Pet nest */}
       <div className="relative px-3 pb-4 pt-2">
