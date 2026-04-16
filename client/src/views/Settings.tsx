@@ -10,6 +10,7 @@ import {
   getCredentials,
   saveCredentials,
 } from "@/lib/store";
+import { signOut } from "@/lib/auth";
 import type { Course } from "@/lib/types";
 
 export function Settings() {
@@ -42,7 +43,7 @@ export function Settings() {
     await saveCredentials({ gsEmail: "", gsPassword: "" });
     await saveSettings({ onboardingComplete: false, serverUrl: "http://localhost:8080", notificationsEnabled: true });
     await saveCourses([]);
-    window.location.reload();
+    signOut();
   };
 
   return (
