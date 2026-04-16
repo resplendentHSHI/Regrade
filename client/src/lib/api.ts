@@ -1,5 +1,4 @@
-// For dev: point to the server. Change to localhost:8080 for local, or Tailnet IP for remote.
-const SERVER_URL = "http://100.101.173.53:8080";
+const SERVER_URL = "https://tp64.tailf28040.ts.net";
 
 async function request(path: string, options: RequestInit & { token?: string } = {}): Promise<Response> {
   const { token, ...fetchOpts } = options;
