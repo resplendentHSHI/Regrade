@@ -1,6 +1,6 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import * as api from "./api";
 import * as store from "./store";
-import { readFile } from "@tauri-apps/plugin-fs";
 
 export async function uploadPendingJobs(token: string): Promise<number> {
   const assignments = await store.getAssignments();
@@ -9,8 +9,15 @@ export async function uploadPendingJobs(token: string): Promise<number> {
   const pending = assignments.filter((a) => a.status === "pending_upload" && a.pdfPath);
   for (const item of pending) {
     try {
-      const pdfBytes = await readFile(item.pdfPath!);
+      // Read PDF bytes via Tauri's asset protocol (works with absolute paths)
+      const assetUrl = convertFileSrc(item.pdfPath!);
+      const resp = await fetch(assetUrl);
+      if (!resp.ok) {
+        throw new Error(`Failed to read PDF: ${resp.status} ${resp.statusText} (${item.pdfPath})`);
+      }
+      const pdfBytes = await resp.arrayBuffer();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
+
       const result = await api.uploadJob(token, blob, {
         courseId: item.courseId,
         assignmentId: item.assignmentId,
@@ -22,8 +29,9 @@ export async function uploadPendingJobs(token: string): Promise<number> {
       uploaded++;
       await store.addActivity(`Uploaded ${item.name} for analysis`, "info");
     } catch (err) {
-      console.error(`Upload failed for ${item.name}:`, err);
-      await store.addActivity(`Upload failed for ${item.name}: ${err}`, "warning");
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Upload failed for ${item.name}:`, msg);
+      await store.addActivity(`Upload failed for ${item.name}: ${msg}`, "warning");
     }
   }
 
