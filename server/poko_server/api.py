@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from poko_server import config, db
 from poko_server.auth import get_current_user_email
+from poko_server.jobs import recover_interrupted_jobs, cleanup_old_jobs, start_worker
 from poko_server.metrics import process_score_sync
 
 log = logging.getLogger(__name__)
@@ -22,6 +23,15 @@ _start_time = time.monotonic()
 @app.on_event("startup")
 def startup():
     db.create_tables()
+    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    recovered = recover_interrupted_jobs()
+    if recovered:
+        log.info("Recovered %d interrupted jobs", recovered)
+    cleaned = cleanup_old_jobs()
+    if cleaned:
+        log.info("Cleaned up %d old jobs", cleaned)
+    start_worker()
 
 
 @app.on_event("shutdown")

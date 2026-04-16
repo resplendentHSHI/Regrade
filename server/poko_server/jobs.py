@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 import shutil
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from poko_server import config, db
@@ -90,3 +92,24 @@ def recover_interrupted_jobs() -> int:
         log.warning("Recovering stuck job %s → uploaded", job["id"])
         db.update_job_status(job["id"], "uploaded")
     return len(stuck)
+
+
+def _worker_loop(poll_interval: float = 10.0) -> None:
+    """Background thread that polls for pending jobs and processes them."""
+    while True:
+        try:
+            counts = process_pending_jobs()
+            if counts["processed"] > 0:
+                log.info("Worker processed %d jobs: %d complete, %d failed",
+                         counts["processed"], counts["complete"], counts["failed"])
+        except Exception:
+            log.exception("Worker error during job processing")
+        time.sleep(poll_interval)
+
+
+def start_worker(poll_interval: float = 10.0) -> threading.Thread:
+    """Start the background job worker thread."""
+    t = threading.Thread(target=_worker_loop, args=(poll_interval,), daemon=True)
+    t.start()
+    log.info("Background job worker started (poll every %.0fs)", poll_interval)
+    return t
