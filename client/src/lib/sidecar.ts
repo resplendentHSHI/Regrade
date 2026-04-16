@@ -9,6 +9,8 @@ interface SidecarResponse {
 const SIDECAR_DIR = "/home/hshi/Desktop/Gradescope-Bot/client/sidecar";
 
 async function runSidecar(args: string[]): Promise<SidecarResponse> {
+  // "python3" is the scoped command name — maps to the full conda python path
+  // in src-tauri/capabilities/default.json
   const cmd = Command.create("python3", [
     `${SIDECAR_DIR}/sidecar_main.py`,
     ...args,

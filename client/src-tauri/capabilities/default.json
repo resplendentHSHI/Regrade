@@ -11,7 +11,7 @@
       "allow": [
         {
           "name": "python3",
-          "cmd": "python3",
+          "cmd": "/home/hshi/miniconda3/envs/GSdev/bin/python",
           "args": true
         }
       ]
@@ -21,7 +21,7 @@
       "allow": [
         {
           "name": "python3",
-          "cmd": "python3",
+          "cmd": "/home/hshi/miniconda3/envs/GSdev/bin/python",
           "args": true
         }
       ]
