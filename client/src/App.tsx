@@ -11,7 +11,7 @@ import { Settings } from "./views/Settings";
 import { getSettings, getCredentials, getHeartbeatState, getAssignments } from "./lib/store";
 import { signIn, getStoredToken } from "./lib/auth";
 import { runHeartbeat, shouldRunHeartbeat } from "./lib/heartbeat";
-import { pollJobResults } from "./lib/queue";
+import { pollJobResults, uploadPendingJobs } from "./lib/queue";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 
@@ -103,6 +103,15 @@ export default function App() {
 
       pollInterval = setInterval(async () => {
         const assignments = await getAssignments();
+        // Retry any stuck pending uploads (e.g., previous attempts failed)
+        const hasPending = assignments.some(
+          (a) => a.status === "pending_upload" && a.pdfPath
+        );
+        if (hasPending) {
+          uploadPendingJobs(token!).catch((err) =>
+            console.error("Upload retry error:", err)
+          );
+        }
         const hasInFlight = assignments.some(
           (a) => a.jobId && (a.status === "uploading" || a.status === "analyzing")
         );
