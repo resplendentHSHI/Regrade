@@ -6,7 +6,11 @@ interface SidecarResponse {
   [key: string]: unknown;
 }
 
-const SIDECAR_DIR = "/home/hshi/Desktop/Gradescope-Bot/client/sidecar";
+// Resolve sidecar path relative to the app. Adjust per platform.
+const IS_MAC = navigator.userAgent.includes("Mac");
+const SIDECAR_DIR = IS_MAC
+  ? "/Users/xiaoxia/Desktop/poko/client/sidecar"
+  : "/home/hshi/Desktop/Gradescope-Bot/client/sidecar";
 
 async function runSidecar(args: string[]): Promise<SidecarResponse> {
   // "python3" is the scoped command name — maps to the full conda python path
