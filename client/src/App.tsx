@@ -5,6 +5,7 @@ import { Onboarding } from "./views/Onboarding";
 import { Home } from "./views/Home";
 import { Assignments } from "./views/Assignments";
 import { AssignmentDetail } from "./views/AssignmentDetail";
+import { Queue } from "./views/Queue";
 import { Upcoming } from "./views/Upcoming";
 import { Settings } from "./views/Settings";
 import { getSettings, getCredentials, getHeartbeatState, getAssignments } from "./lib/store";
@@ -131,6 +132,7 @@ export default function App() {
         <main className="flex-1 overflow-auto">
           <Routes>
             <Route path="/" element={<Home token={token} />} />
+            <Route path="/queue" element={<Queue />} />
             <Route path="/assignments" element={<Assignments />} />
             <Route path="/assignments/:id" element={<AssignmentDetail />} />
             <Route path="/upcoming" element={<Upcoming />} />

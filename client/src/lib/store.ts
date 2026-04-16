@@ -52,6 +52,14 @@ export const getSettings = () => readJson<Settings>("settings.json", {
 });
 export const saveSettings = (s: Settings) => writeJson("settings.json", s);
 
+export async function removeAssignment(courseId: string, assignmentId: string) {
+  const items = await getAssignments();
+  const filtered = items.filter(
+    (a) => !(a.courseId === courseId && a.assignmentId === assignmentId)
+  );
+  await saveAssignments(filtered);
+}
+
 interface Credentials { gsEmail: string; gsPassword: string; }
 export const getCredentials = () => readJson<Credentials>("credentials.json", { gsEmail: "", gsPassword: "" });
 export const saveCredentials = (c: Credentials) => writeJson("credentials.json", c);
