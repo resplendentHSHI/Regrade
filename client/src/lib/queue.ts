@@ -75,7 +75,26 @@ export async function pollJobResults(token: string): Promise<number> {
         item.status = "analyzing";
       }
     } catch (err) {
-      console.error(`Poll failed for ${item.name}:`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Poll failed for ${item.name}:`, msg);
+      // If server returned 404, the job was deleted. Self-heal:
+      // - if we already have a result stored, mark it complete based on kept count
+      // - otherwise the upload was lost; revert to pending_upload so it retries
+      if (msg.includes("404")) {
+        if (item.resultJson) {
+          try {
+            const parsed = JSON.parse(item.resultJson);
+            const kept = parsed.kept_issue_count || 0;
+            item.status = kept > 0 ? "regrade_candidates" : "no_issues";
+          } catch {
+            item.status = "no_issues";
+          }
+        } else {
+          // Lost upload — clear jobId and put back in queue for retry
+          item.jobId = undefined;
+          item.status = "pending_upload";
+        }
+      }
     }
   }
 

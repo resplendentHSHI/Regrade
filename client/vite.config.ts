@@ -2,9 +2,19 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { execFileSync } from "child_process";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+
+function gitShortSha(): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"]).toString().trim();
+  } catch {
+    // @ts-expect-error process
+    return (process.env.GITHUB_SHA as string)?.slice(0, 7) || "dev";
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
@@ -13,6 +23,7 @@ export default defineConfig(async () => ({
     __GOOGLE_CLIENT_ID__: JSON.stringify(process.env.GOOGLE_CLIENT_ID || ""),
     // @ts-expect-error process is a nodejs global
     __GOOGLE_CLIENT_SECRET__: JSON.stringify(process.env.GOOGLE_CLIENT_SECRET || ""),
+    __BUILD_COMMIT__: JSON.stringify(gitShortSha()),
   },
   plugins: [react(), tailwindcss()],
   resolve: {

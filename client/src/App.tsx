@@ -14,6 +14,7 @@ import { runHeartbeat, shouldRunHeartbeat } from "./lib/heartbeat";
 import { pollJobResults, uploadPendingJobs } from "./lib/queue";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -147,10 +148,12 @@ export default function App() {
   // Step 4: Dashboard
   return (
     <BrowserRouter>
-      <div className="flex h-screen">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          <Routes>
+      <div className="flex flex-col h-screen">
+        <UpdateBanner />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-auto">
+            <Routes>
             <Route path="/" element={<Home token={token} />} />
             <Route path="/queue" element={<Queue />} />
             <Route path="/assignments" element={<Assignments />} />
@@ -159,7 +162,8 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </main>
+          </main>
+        </div>
       </div>
     </BrowserRouter>
   );
