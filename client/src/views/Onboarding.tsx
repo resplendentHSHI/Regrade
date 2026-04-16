@@ -46,6 +46,19 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       if (result.ok) {
         setLoginOk(true);
         await saveCredentials({ gsEmail: email, gsPassword: password });
+        // Pre-fetch courses in background so step 2 loads instantly
+        setLoadingCourses(true);
+        fetchCourses(email, password)
+          .then((raw) => {
+            setCourses(
+              raw.map((c) => ({
+                id: c.id, name: c.name, semester: c.semester,
+                year: c.year, enabled: false, policyAckAt: null,
+              }))
+            );
+          })
+          .catch(() => {})
+          .finally(() => setLoadingCourses(false));
       } else {
         setLoginError(result.error || "Login failed. Check your credentials.");
       }
@@ -57,7 +70,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   }
 
   useEffect(() => {
-    if (step !== 2) return;
+    // Only fetch if we don't already have courses (pre-fetched from login)
+    if (step !== 2 || courses.length > 0) return;
     let cancelled = false;
     setLoadingCourses(true);
     setCourseError("");

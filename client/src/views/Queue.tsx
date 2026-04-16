@@ -334,6 +334,7 @@ export function Queue() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [courseFilter, setCourseFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
     const [a, c] = await Promise.all([getAssignments(), getCourses()]);
@@ -349,8 +350,12 @@ export function Queue() {
 
   const courseMap = new Map(courses.map((c) => [c.id, c]));
 
-  const activeItems = assignments.filter((a) => ACTIVE_STATUSES.has(a.status));
-  const completedItems = assignments.filter((a) => COMPLETED_STATUSES.has(a.status));
+  const filtered = courseFilter === "all"
+    ? assignments
+    : assignments.filter((a) => a.courseId === courseFilter);
+
+  const activeItems = filtered.filter((a) => ACTIVE_STATUSES.has(a.status));
+  const completedItems = filtered.filter((a) => COMPLETED_STATUSES.has(a.status));
 
   // Group completed by course
   const completedGrouped = completedItems.reduce<Record<string, Assignment[]>>((acc, a) => {
@@ -380,6 +385,35 @@ export function Queue() {
           Add Assignment
         </Button>
       </div>
+
+      {/* Course filter chips */}
+      {courses.filter((c) => c.enabled).length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCourseFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              courseFilter === "all"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            All
+          </button>
+          {courses.filter((c) => c.enabled).map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCourseFilter(c.id)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                courseFilter === c.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Active Queue */}
       <section>
