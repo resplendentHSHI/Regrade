@@ -76,6 +76,9 @@ export function Home({ token }: HomeProps) {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 10_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function handleRunNow() {
