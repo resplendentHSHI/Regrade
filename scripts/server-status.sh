@@ -4,7 +4,15 @@
 set -euo pipefail
 
 URL="${1:-https://tp64.tailf28040.ts.net}"
-SECRET="${POKO_ADMIN_SECRET:-admin123}"
+# Read secret from env var, or from server/.env if present
+SECRET="${POKO_ADMIN_SECRET:-}"
+if [ -z "$SECRET" ] && [ -f "$(dirname "$0")/../server/.env" ]; then
+  SECRET=$(grep '^POKO_ADMIN_SECRET=' "$(dirname "$0")/../server/.env" | cut -d= -f2-)
+fi
+if [ -z "$SECRET" ]; then
+  echo "Set POKO_ADMIN_SECRET env var or add it to server/.env"
+  exit 1
+fi
 
 exec python3 - "$URL" "$SECRET" <<'PYEOF'
 import sys, json, urllib.request, urllib.error

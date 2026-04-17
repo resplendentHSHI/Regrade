@@ -15,6 +15,7 @@ import { pollJobResults, uploadPendingJobs, reconcileWithServer } from "./lib/qu
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { BetaBanner } from "./components/BetaBanner";
 
 function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -168,6 +169,7 @@ export default function App() {
     <BrowserRouter>
       <div className="flex flex-col h-screen">
         <UpdateBanner />
+        <BetaBanner />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           <main className="flex-1 overflow-auto">

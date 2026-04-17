@@ -21,6 +21,9 @@ PRESCREEN_PROMPT = PROMPTS_DIR / "regrade_prescreen.md"
 GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 DEV_MODE = os.environ.get("POKO_DEV_MODE", "0") == "1"
 DEV_EMAIL = os.environ.get("POKO_DEV_EMAIL", "dev@poko.local")
+# Dev-mode requires BOTH POKO_DEV_MODE=1 AND a non-empty POKO_DEV_TOKEN env var
+# set to the exact token the client will send. No well-known default.
+DEV_TOKEN = os.environ.get("POKO_DEV_TOKEN", "")
 
 # ── Analyzer ───────────────────────────────────────────────────────────
 CLAUDE_BINARY = os.environ.get("CLAUDE_BINARY", "claude")

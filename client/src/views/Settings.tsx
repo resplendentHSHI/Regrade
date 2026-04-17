@@ -167,15 +167,16 @@ export function Settings() {
       <Separator />
 
       {/* Privacy */}
-      <Card>
+      <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Privacy</CardTitle>
+          <CardTitle className="font-heading text-lg">Privacy</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
           <p>
             Poko downloads your graded PDFs from Gradescope and sends them to our
-            server for AI analysis. The PDF is permanently deleted from our server
-            immediately after processing. We never retain your coursework.
+            server for AI analysis. The PDF is{" "}
+            <span className="font-medium text-foreground">permanently deleted</span>{" "}
+            from our server immediately after processing. We never retain your coursework.
           </p>
           <p>
             Your Gradescope credentials are stored locally on your device only and
@@ -183,7 +184,61 @@ export function Settings() {
             and aggregate stats (pages reviewed, points recovered) on our server.
           </p>
           <p>
-            You can delete all stored data at any time by signing out below.
+            Your data is handled with the{" "}
+            <a
+              href="https://resend.com/security"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+              onClick={(e) => {
+                e.preventDefault();
+                import("@tauri-apps/plugin-opener").then((m) =>
+                  m.openUrl("https://resend.com/security")
+                );
+              }}
+            >
+              same security posture
+            </a>{" "}
+            we use for notification email. Sign out (below) to delete everything
+            stored on this device.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Terms of Use */}
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="font-heading text-lg">Terms of Use</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <p>
+            <span className="font-medium text-foreground">Your course's policy comes first.</span>{" "}
+            You confirmed this for each enabled course during setup. Poko is a
+            grading-assistance tool, not a loophole — if your instructor or
+            academic integrity office says don't use automated tools, don't.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Regrade requests are your responsibility.</span>{" "}
+            Poko drafts suggestions. You decide whether to send any of them.
+            Please only submit requests you actually believe in, and be polite to
+            your graders — they're usually students too.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">No warranty.</span>{" "}
+            Poko is a small beta project. We make no guarantees about analysis
+            accuracy, uptime, or that your server-side data is safe from total
+            loss. Use it for what it is.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">No abuse.</span>{" "}
+            Don't use Poko to spam graders, submit bad-faith regrades, or
+            scrape Gradescope data you're not supposed to have access to.
+            Accounts doing this may be cut off without notice.
+          </p>
+          <p className="text-xs italic pt-1 border-t border-border">
+            Questions or disputes? Reach out via the Feedback link in the sidebar.
           </p>
         </CardContent>
       </Card>

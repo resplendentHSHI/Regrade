@@ -44,7 +44,8 @@ def get_current_user_email(authorization: str = Header(...)) -> str:
 
     token = authorization[len("Bearer "):]
 
-    if config.DEV_MODE and token == "dev-token-placeholder":
+    # Dev-mode bypass requires a secret env var and the secret token, not a well-known string
+    if config.DEV_MODE and config.DEV_TOKEN and token == config.DEV_TOKEN:
         email = config.DEV_EMAIL
     else:
         email = verify_google_token(token)
