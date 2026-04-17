@@ -256,3 +256,110 @@
     white-space: pre;
     letter-spacing: 0.02em;
 }
+
+/* ────────────── Onboarding "brief" card motion (quant-lab aesthetic) ────────────── */
+
+/* Precise, deliberate glide — sinusoidal out, no bounce */
+@keyframes brief-glide {
+    0%   { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Hairline tick mark that scans out from the left */
+@keyframes brief-tick {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+
+/* SVG stroke that draws itself in */
+@keyframes brief-draw {
+    0%   { stroke-dashoffset: var(--len, 400); }
+    100% { stroke-dashoffset: 0; }
+}
+
+/* Subtle fade-pulse for grid background (barely perceptible) */
+@keyframes brief-grid-breathe {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 0.55; }
+}
+
+/* Endpoint dot: appears after its curve finishes drawing */
+@keyframes brief-dot-pop {
+    0%, 70% { opacity: 0; transform: scale(0.6); }
+    100%    { opacity: 1; transform: scale(1); }
+}
+
+/* Button sheen — a single slow sweep on mount */
+@keyframes brief-sheen {
+    0%   { transform: translateX(-120%) skewX(-20deg); }
+    100% { transform: translateX(220%) skewX(-20deg); }
+}
+
+/* Stagger helpers — each one kicks off brief-glide at a fixed offset */
+.brief-glide      { animation: brief-glide 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.brief-delay-1    { animation-delay: 0.05s; }
+.brief-delay-2    { animation-delay: 0.18s; }
+.brief-delay-3    { animation-delay: 0.34s; }
+.brief-delay-4    { animation-delay: 0.52s; }
+.brief-delay-5    { animation-delay: 0.70s; }
+.brief-delay-6    { animation-delay: 0.88s; }
+
+.brief-tick {
+    transform-origin: left center;
+    animation: brief-tick 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.brief-draw {
+    stroke-dasharray: var(--len, 400);
+    stroke-dashoffset: var(--len, 400);
+    animation: brief-draw 1.6s cubic-bezier(0.4, 0.0, 0.2, 1) both;
+}
+
+.brief-dot-pop {
+    animation: brief-dot-pop 1.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Graph-paper grid — uses pastel muted tone, barely there */
+.brief-grid {
+    background-image:
+      linear-gradient(to right,
+        color-mix(in oklch, var(--foreground) 6%, transparent) 1px,
+        transparent 1px),
+      linear-gradient(to bottom,
+        color-mix(in oklch, var(--foreground) 6%, transparent) 1px,
+        transparent 1px);
+    background-size: 22px 22px;
+    animation: brief-grid-breathe 7s ease-in-out infinite;
+}
+
+/* Monospace numeric badges for section numbering */
+.brief-index {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    color: color-mix(in oklch, var(--muted-foreground) 85%, transparent);
+}
+
+.brief-nums {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Button with single sheen sweep on mount */
+.brief-button {
+    position: relative;
+    overflow: hidden;
+}
+.brief-button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--primary-foreground) 35%, transparent) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+    animation: brief-sheen 2.6s cubic-bezier(0.4, 0.0, 0.2, 1) 0.9s both;
+}
