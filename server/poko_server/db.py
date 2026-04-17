@@ -235,6 +235,23 @@ def update_job_status(
     conn.commit()
 
 
+def list_jobs_for_user(user_id: str) -> list[dict]:
+    """Return all jobs for a user, including results if present."""
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT id, pdf_hash, course_id, assignment_id, assignment_name,
+               course_name, status, result_json, draft_md,
+               created_at, completed_at
+        FROM jobs
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def list_jobs_by_status(status: str) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(

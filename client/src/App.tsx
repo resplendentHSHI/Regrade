@@ -11,7 +11,7 @@ import { Settings } from "./views/Settings";
 import { getSettings, getCredentials, getHeartbeatState, getAssignments } from "./lib/store";
 import { signIn, getStoredToken } from "./lib/auth";
 import { runHeartbeat, shouldRunHeartbeat } from "./lib/heartbeat";
-import { pollJobResults, uploadPendingJobs } from "./lib/queue";
+import { pollJobResults, uploadPendingJobs, reconcileWithServer } from "./lib/queue";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -78,8 +78,18 @@ export default function App() {
 
     let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let reconcileInterval: ReturnType<typeof setInterval> | null = null;
 
     async function init() {
+      // Reconcile first — catches any state drift from previous session
+      reconcileWithServer(token!).then((r) => {
+        if (r.claimed || r.pulled || r.orphaned) {
+          console.info(
+            `Reconciled: claimed=${r.claimed} pulled=${r.pulled} orphaned=${r.orphaned}`
+          );
+        }
+      }).catch((err) => console.warn("Reconcile failed:", err));
+
       const state = await getHeartbeatState();
       if (shouldRunHeartbeat(state.lastRun)) {
         const creds = await getCredentials();
@@ -101,6 +111,13 @@ export default function App() {
           }
         }
       }, 60_000);
+
+      // Full reconcile every 2 minutes for safety net
+      reconcileInterval = setInterval(() => {
+        reconcileWithServer(token!).catch((err) =>
+          console.warn("Periodic reconcile failed:", err)
+        );
+      }, 120_000);
 
       pollInterval = setInterval(async () => {
         const assignments = await getAssignments();
@@ -129,6 +146,7 @@ export default function App() {
     return () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       if (pollInterval) clearInterval(pollInterval);
+      if (reconcileInterval) clearInterval(reconcileInterval);
     };
   }, [onboarded, token]);
 

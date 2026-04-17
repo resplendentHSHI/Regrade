@@ -73,6 +73,21 @@ export async function syncScores(token: string,
   return resp.json() as Promise<{ changes_detected: number; total_points_delta: number; details: unknown[] }>;
 }
 
+export async function syncJobs(token: string) {
+  const resp = await request("/sync/jobs", { token });
+  if (!resp.ok) throw new Error(`Sync failed: ${resp.status}`);
+  return resp.json() as Promise<{
+    by_hash: Record<string, {
+      job_id: string;
+      status: string;
+      has_result: boolean;
+      has_draft: boolean;
+      completed_at: string | null;
+    }>;
+    count: number;
+  }>;
+}
+
 export async function getUserStats(token: string) {
   const resp = await request("/users/me/stats", { token });
   if (!resp.ok) throw new Error(`Stats fetch failed: ${resp.status}`);

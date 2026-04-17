@@ -194,6 +194,34 @@ def auth_verify(email: str = Depends(get_current_user_email)):
     return {"email": email, "user_id": user["id"]}
 
 
+@app.get("/sync/jobs")
+def sync_jobs(email: str = Depends(get_current_user_email)):
+    """Return all jobs for this user, keyed by pdf_hash.
+
+    The client uses this to reconcile its local state. Server is source
+    of truth — client checks each local pending assignment's hash against
+    this list. If server has it → client claims the job_id. If not →
+    client uploads.
+    """
+    _check_rate_limit(email)
+    user = db.get_user_by_email(email)
+    if user is None:
+        return {"jobs": []}
+
+    jobs = db.list_jobs_for_user(user["id"])
+    # Return a compact dict keyed by pdf_hash
+    by_hash = {}
+    for j in jobs:
+        by_hash[j["pdf_hash"]] = {
+            "job_id": j["id"],
+            "status": j["status"],
+            "has_result": j["result_json"] is not None,
+            "has_draft": j["draft_md"] is not None,
+            "completed_at": j["completed_at"],
+        }
+    return {"by_hash": by_hash, "count": len(by_hash)}
+
+
 @app.get("/users/me/stats")
 def user_stats(email: str = Depends(get_current_user_email)):
     _check_rate_limit(email)
