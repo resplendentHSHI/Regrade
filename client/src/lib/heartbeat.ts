@@ -44,11 +44,8 @@ export async function runHeartbeat(
 
     // First run (no assignments yet): backfill 30 days.
     // Subsequent runs: download ALL newly graded (no date limit).
-    // First run: backfill the whole semester (120 days) so mid-semester
-    // users don't get zero downloads. The old 30-day window silently
-    // skipped assignments whose due date was >30 days ago.
     const isFirstRun = assignments.length === 0;
-    const backfillDays = isFirstRun ? 120 : undefined;
+    const backfillDays = isFirstRun ? 30 : undefined;
 
     if (isFirstRun) {
       await progress("First run — downloading graded assignments from this semester…");
