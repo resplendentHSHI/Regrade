@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PolicyModal } from "@/components/PolicyModal";
 import { testLogin, fetchCourses } from "@/lib/sidecar";
-import { saveCredentials } from "@/lib/store";
+import { saveCredentials, getCredentials } from "@/lib/store";
 import { saveCourses, getSettings, saveSettings } from "@/lib/store";
 import type { Course } from "@/lib/types";
 
@@ -36,6 +36,19 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [courseError, setCourseError] = useState("");
   const [policyTarget, setPolicyTarget] = useState<Course | null>(null);
   const [finishing, setFinishing] = useState(false);
+
+  // On mount: if the user has already saved Gradescope credentials in a
+  // previous session (or earlier in this one and then came back via Back),
+  // trust them — skip the re-entry form and show a "connected" confirmation.
+  useEffect(() => {
+    getCredentials().then((c) => {
+      if (c.gsEmail && c.gsPassword) {
+        setEmail(c.gsEmail);
+        setPassword(c.gsPassword);
+        setLoginOk(true);
+      }
+    });
+  }, []);
 
   async function handleTestLogin() {
     setTesting(true);
@@ -433,56 +446,87 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="gs-email">Gradescope email</Label>
-                <Input
-                  id="gs-email"
-                  type="email"
-                  placeholder="your.personal@gmail.com"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setLoginOk(false); setLoginError(""); }}
-                  autoFocus
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gs-password">Password</Label>
-                <Input
-                  id="gs-password"
-                  type="password"
-                  placeholder="The password you set on Gradescope"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setLoginOk(false); setLoginError(""); }}
-                />
-              </div>
-
-              <Button
-                onClick={handleTestLogin}
-                disabled={testing || !email || !password}
-                className="w-full"
-              >
-                {testing ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              {loginOk ? (
+                /* Already connected — don't let them re-submit creds */
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <svg
+                      className="h-5 w-5 text-primary mt-0.5 shrink-0"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
                     </svg>
-                    Signing in...
-                  </span>
-                ) : (
-                  "Let's go!"
-                )}
-              </Button>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Connected to Gradescope</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 break-all">
+                        {email}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginOk(false);
+                      setPassword("");
+                      setLoginError("");
+                    }}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    Use a different account
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="gs-email">Gradescope email</Label>
+                    <Input
+                      id="gs-email"
+                      type="email"
+                      placeholder="your.personal@gmail.com"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setLoginError(""); }}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gs-password">Password</Label>
+                    <Input
+                      id="gs-password"
+                      type="password"
+                      placeholder="The password you set on Gradescope"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setLoginError(""); }}
+                    />
+                  </div>
 
-              {loginOk && (
-                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Connected successfully!
-                </p>
-              )}
-              {loginError && (
-                <p className="text-sm text-destructive">{loginError}</p>
+                  <Button
+                    onClick={handleTestLogin}
+                    disabled={testing || !email || !password}
+                    className="w-full"
+                  >
+                    {testing ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        Signing in...
+                      </span>
+                    ) : (
+                      "Let's go!"
+                    )}
+                  </Button>
+
+                  {loginError && (
+                    <p className="text-sm text-destructive">{loginError}</p>
+                  )}
+                </>
               )}
             </CardContent>
             <CardFooter className="justify-between">
