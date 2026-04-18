@@ -53,4 +53,6 @@ export interface HeartbeatState {
   nextScheduled: string | null;
   status: "idle" | "running" | "error";
   queueDepth: number;
+  /** Live progress message shown during a running heartbeat. */
+  progressMessage?: string;
 }

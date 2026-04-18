@@ -12,15 +12,26 @@ export async function runHeartbeat(
 ): Promise<void> {
   const state = await store.getHeartbeatState();
   state.status = "running";
+  state.progressMessage = "Starting scan…";
   await store.saveHeartbeatState(state);
+
+  /** Persist a progress message so the UI can poll it. */
+  async function progress(msg: string) {
+    state.progressMessage = msg;
+    await store.saveHeartbeatState(state);
+  }
 
   try {
     const courses = await store.getCourses();
     const enabledIds = courses.filter((c) => c.enabled).map((c) => c.id);
     if (enabledIds.length === 0) {
       state.status = "idle";
+      state.progressMessage = undefined;
       return;
     }
+
+    const enabledNames = courses.filter((c) => c.enabled).map((c) => c.name);
+    await progress(`Scanning ${enabledNames.length} course${enabledNames.length === 1 ? "" : "s"}…`);
 
     const appData = await appDataDir();
     const sep = appData.endsWith("/") || appData.endsWith("\\") ? "" : "/";
@@ -33,13 +44,31 @@ export async function runHeartbeat(
 
     // First run (no assignments yet): backfill 30 days.
     // Subsequent runs: download ALL newly graded (no date limit).
+    // First run: backfill the whole semester (120 days) so mid-semester
+    // users don't get zero downloads. The old 30-day window silently
+    // skipped assignments whose due date was >30 days ago.
     const isFirstRun = assignments.length === 0;
-    const backfillDays = isFirstRun ? 30 : undefined;
+    const backfillDays = isFirstRun ? 120 : undefined;
+
+    if (isFirstRun) {
+      await progress("First run — downloading graded assignments from this semester…");
+      await store.addActivity("First-time setup: scanning Gradescope for graded work", "info");
+    } else {
+      await progress("Checking Gradescope for newly graded assignments…");
+    }
 
     // 1. Fetch graded PDFs + scores from Gradescope
     const result = await sidecar.fetchGraded(
       gsEmail, gsPassword, enabledIds, dataDir, alreadyProcessedIds, backfillDays,
     );
+
+    const newCount = (result.items as any[]).length;
+
+    if (newCount > 0) {
+      await progress(`Found ${newCount} new assignment${newCount === 1 ? "" : "s"}, saving…`);
+    } else {
+      await progress("No new assignments found.");
+    }
 
     // 2. Add new items to local assignments
     const courseMap = new Map(courses.map((c) => [c.id, c.name]));
@@ -64,6 +93,7 @@ export async function runHeartbeat(
     // 3. Sync scores with server
     const scores = result.scores as any[];
     if (scores.length > 0) {
+      await progress(`Syncing ${scores.length} score${scores.length === 1 ? "" : "s"} with server…`);
       try {
         await api.syncScores(token, scores);
       } catch (err) {
@@ -72,12 +102,25 @@ export async function runHeartbeat(
     }
 
     // 4. Upload pending PDFs to server
+    const pendingCount = (await store.getAssignments()).filter(
+      (a) => a.status === "pending_upload" && a.pdfPath,
+    ).length;
+    if (pendingCount > 0) {
+      await progress(`Uploading ${pendingCount} PDF${pendingCount === 1 ? "" : "s"} for analysis…`);
+    }
     await uploadPendingJobs(token);
 
     // 5. Poll for any completed results
+    const inFlightCount = (await store.getAssignments()).filter(
+      (a) => a.jobId && (a.status === "uploading" || a.status === "queued" || a.status === "analyzing"),
+    ).length;
+    if (inFlightCount > 0) {
+      await progress(`Checking ${inFlightCount} in-flight analysis job${inFlightCount === 1 ? "" : "s"}…`);
+    }
     await pollJobResults(token);
 
     // 6. Fetch upcoming assignments
+    await progress("Checking for upcoming due dates…");
     try {
       const upcoming = await sidecar.fetchUpcoming(gsEmail, gsPassword, enabledIds);
       await store.saveUpcoming(upcoming);
@@ -85,10 +128,11 @@ export async function runHeartbeat(
       console.error("Upcoming fetch failed:", err);
     }
 
-    const newCount = (result.items as any[]).length;
     try {
       await store.addActivity(
-        `Heartbeat complete: ${newCount} new assignment(s) found`,
+        newCount > 0
+          ? `Scan complete: found ${newCount} new assignment${newCount === 1 ? "" : "s"}`
+          : "Scan complete: no new assignments",
         newCount > 0 ? "success" : "info",
       );
     } catch (err) {
@@ -97,8 +141,9 @@ export async function runHeartbeat(
 
     state.lastRun = new Date().toISOString();
     state.status = "idle";
+    state.progressMessage = undefined;
     state.queueDepth = (await store.getAssignments()).filter(
-      (a) => a.status === "pending_upload" || a.status === "uploading" || a.status === "analyzing",
+      (a) => a.status === "pending_upload" || a.status === "uploading" || a.status === "queued" || a.status === "analyzing",
     ).length;
   } catch (err) {
     state.status = "error";
