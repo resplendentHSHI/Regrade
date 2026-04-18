@@ -19,7 +19,7 @@ export interface Assignment {
   type: string;
   pdfHash?: string;
   pdfPath?: string;
-  status: "pending_upload" | "uploading" | "analyzing" | "complete" | "failed" | "no_issues" | "regrade_candidates";
+  status: "pending_upload" | "uploading" | "queued" | "analyzing" | "complete" | "failed" | "no_issues" | "regrade_candidates";
   resultJson?: string;
   draftMd?: string;
   jobId?: string;
