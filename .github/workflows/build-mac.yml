@@ -100,24 +100,23 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-          # Ad-hoc sign the .app so Gatekeeper shows "unidentified developer"
-          # instead of the hard-block "damaged" error on fresh downloads.
-          # (Real notarization requires $99/yr Apple Developer membership.)
-          APPLE_SIGNING_IDENTITY: "-"
+          # NOTE: APPLE_SIGNING_IDENTITY is intentionally unset.
+          # Ad-hoc signing the .app with --deep re-signs the nested
+          # PyInstaller sidecar, which enables hardened runtime on the
+          # sidecar. Hardened runtime then rejects the embedded
+          # Python.framework at load time with "different Team IDs"
+          # because the framework was signed by Python.org, not by our
+          # ad-hoc identity. Users see a dlopen crash on launch.
+          # Leaving the app unsigned means a "damaged" Gatekeeper error
+          # on fresh downloads (xattr -cr workaround), but the app
+          # actually runs — which is strictly better than breaking the
+          # sidecar. Proper fix requires either a paid Apple Developer
+          # ID (signs everything with one Team ID) or a custom
+          # post-build resign step that strips hardened runtime from
+          # the sidecar and re-generates the updater signature.
         run: |
           bun run build
           bun run tauri build
-
-      - name: Verify ad-hoc signature on .app bundle
-        run: |
-          # Just verify — don't re-sign here, because the .app.tar.gz and its
-          # minisign signature are already generated from the .app at this point.
-          # Re-signing would break the updater signature.
-          APP=$(find client/src-tauri/target/release/bundle/macos -maxdepth 2 -name "*.app" | head -1)
-          if [ -z "$APP" ]; then echo "ERROR: no .app bundle found"; exit 1; fi
-          echo "Verifying ad-hoc signature on $APP"
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          echo "Signature OK."
 
       - name: Generate latest.json manifest for auto-updater
         env:
@@ -194,7 +193,7 @@ jobs:
           # Delete old release so asset URLs stay stable
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
 
-          NOTES="Poko v${APP_VERSION} · built from branch \`${REF_NAME}\` @ ${SHA_SHORT}"$'\n\n'"**New download:** [Poko-mac.dmg](https://github.com/${REPO}/releases/download/${TAG}/Poko-mac.dmg)"$'\n\n'"### First-time install (macOS)"$'\n'"Poko is ad-hoc signed but not Apple-notarized yet, so macOS will warn the first time you open it."$'\n\n'"1. Open the DMG and drag **Poko.app** to Applications."$'\n'"2. In Finder, **right-click** (or Control-click) Poko.app → **Open**."$'\n'"3. Click **Open** in the warning dialog. This only happens once."$'\n\n'"If you instead see a **\"Poko.app is damaged and can't be opened\"** error (older downloads only), run this in Terminal:"$'\n\n'"\`\`\`bash"$'\n'"xattr -cr /Applications/Poko.app"$'\n'"\`\`\`"$'\n\n'"**Existing Poko apps will auto-update via the in-app banner** — no need to redownload."$'\n\n'"Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          NOTES="Poko v${APP_VERSION} · built from branch \`${REF_NAME}\` @ ${SHA_SHORT}"$'\n\n'"**New download:** [Poko-mac.dmg](https://github.com/${REPO}/releases/download/${TAG}/Poko-mac.dmg)"$'\n\n'"### First-time install (macOS)"$'\n'"Poko is not yet Apple-notarized (beta — no Apple Developer membership), so macOS blocks fresh downloads with a \"Poko.app is damaged\" error. Clear the download quarantine flag once:"$'\n\n'"1. Open the DMG and drag **Poko.app** to Applications."$'\n'"2. In Terminal, run:"$'\n'"\`\`\`bash"$'\n'"xattr -cr /Applications/Poko.app"$'\n'"\`\`\`"$'\n'"3. Open Poko.app normally."$'\n\n'"**Existing Poko apps will auto-update via the in-app banner** — no need to redownload."$'\n\n'"Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
 
           gh release create "$TAG" \
             Poko-mac.dmg \
