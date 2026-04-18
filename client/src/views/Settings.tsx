@@ -56,6 +56,7 @@ export function Settings() {
       "heartbeat.json",
       "settings.json",
       "pet.json",
+      "tokens.json",
     ];
     for (const name of STORE_FILES) {
       try {
