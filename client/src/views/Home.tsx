@@ -41,7 +41,11 @@ export function Home({ token }: HomeProps) {
   const [stats, setStats] = useState({ pointsRecovered: 0, pagesReviewed: 0, assignmentsAnalyzed: 0 });
   const [liveQueueDepth, setLiveQueueDepth] = useState(0);
   const [serverOffline, setServerOffline] = useState(false);
-  const [running, setRunning] = useState(false);
+
+  // Derive from the persisted heartbeat status so the button state survives
+  // tab switches and component unmounts. A purely-local useState would reset
+  // to false when the user navigates away, even if the scan is still going.
+  const isRunning = heartbeat?.status === "running";
 
   async function loadLocalStats() {
     const assignments = await getAssignments();
@@ -86,23 +90,39 @@ export function Home({ token }: HomeProps) {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 10_000);
+    // Poll faster while a heartbeat is running so button/queue updates feel
+    // snappy; relax once idle.
+    const intervalMs = isRunning ? 2_000 : 10_000;
+    const interval = setInterval(loadData, intervalMs);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, isRunning]);
 
   async function handleRunNow() {
-    setRunning(true);
-    try {
-      const creds = await getCredentials();
-      const t = token ?? "";
-      await runHeartbeat(creds.gsEmail, creds.gsPassword, t);
-      await loadData();
-    } catch (err) {
-      console.error("Run now error:", err);
-    } finally {
-      setRunning(false);
+    // Guard: if a scan is already in progress (this tab or any other view),
+    // don't start a second one. The persisted heartbeat status is the
+    // source of truth.
+    if (isRunning) return;
+
+    const creds = await getCredentials();
+    if (!creds.gsEmail || !creds.gsPassword) {
+      console.warn("Run Now: no Gradescope credentials saved");
+      return;
     }
+    const t = token ?? "";
+
+    // Fire-and-forget: runHeartbeat writes status="running" to storage
+    // immediately, which the polling loop will pick up and flip the UI.
+    // We don't await the whole run — that let the UI state fall out of
+    // sync with actual progress when the user navigated away.
+    runHeartbeat(creds.gsEmail, creds.gsPassword, t).catch((err) =>
+      console.error("Run now error:", err)
+    );
+
+    // Refresh eagerly so the "Running…" state appears within ~300ms
+    // rather than waiting for the next 2s poll tick.
+    setTimeout(loadData, 300);
+    setTimeout(loadData, 1200);
   }
 
   return (
@@ -176,9 +196,9 @@ export function Home({ token }: HomeProps) {
             size="sm"
             variant="outline"
             onClick={handleRunNow}
-            disabled={running}
+            disabled={isRunning}
           >
-            {running ? (
+            {isRunning ? (
               <span className="flex items-center gap-2">
                 <span className="inline-block h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
                 Running…

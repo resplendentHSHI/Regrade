@@ -16,6 +16,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { BetaBanner } from "./components/BetaBanner";
+import { HeartbeatBanner } from "./components/HeartbeatBanner";
 
 function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -83,10 +84,14 @@ export default function App() {
 
     async function init() {
       // Heal stale "running" heartbeat status from a crashed prior session
-      // before anything else reads it.
-      resetStaleRunningStatus().catch((err) =>
-        console.warn("Reset stale running status failed:", err)
-      );
+      // BEFORE anything else reads it. Await-ing ensures we don't race
+      // with a concurrent runHeartbeat start, which would otherwise
+      // overwrite the fresh "running" status with a stale "idle".
+      try {
+        await resetStaleRunningStatus();
+      } catch (err) {
+        console.warn("Reset stale running status failed:", err);
+      }
 
       // Reconcile first — catches any state drift from previous session
       reconcileWithServer(token!).then((r) => {
@@ -176,6 +181,7 @@ export default function App() {
       <div className="flex flex-col h-screen">
         <UpdateBanner />
         <BetaBanner />
+        <HeartbeatBanner />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           <main className="flex-1 overflow-auto">
