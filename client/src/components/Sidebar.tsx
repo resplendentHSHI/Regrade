@@ -100,7 +100,7 @@ export function Sidebar() {
   }, [pet?.species]);
 
   return (
-    <aside className="w-60 border-r border-sidebar-border bg-sidebar flex flex-col h-screen relative">
+    <aside className="w-60 border-r border-sidebar-border bg-sidebar flex flex-col h-full relative">
       {/* Subtle paper-texture overlay */}
       <div
         className="pointer-events-none absolute inset-0 opacity-30"
@@ -128,8 +128,8 @@ export function Sidebar() {
         <div className="h-px flex-1 bg-sidebar-border" />
       </div>
 
-      {/* Nav */}
-      <nav className="relative flex-1 px-3 space-y-0.5">
+      {/* Nav — scrollable so the pet nest always stays visible at the bottom */}
+      <nav className="relative flex-1 min-h-0 overflow-y-auto px-3 space-y-0.5">
         {links.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -177,8 +177,8 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Pet nest */}
-      <div className="relative px-3 pb-4 pt-2">
+      {/* Pet nest — shrink-0 so banners don't push it off screen */}
+      <div className="relative px-3 pb-4 pt-2 shrink-0">
         <div className="rounded-2xl border border-sidebar-border bg-card/50 backdrop-blur-sm p-2 relative overflow-hidden">
           {/* warm gradient wash */}
           <div
