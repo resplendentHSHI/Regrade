@@ -27,8 +27,8 @@ DEV_TOKEN = os.environ.get("POKO_DEV_TOKEN", "")
 
 # ── Analyzer ───────────────────────────────────────────────────────────
 CLAUDE_BINARY = os.environ.get("CLAUDE_BINARY", "claude")
-CLAUDE_MODEL = "claude-opus-4-6"
-CLAUDE_EFFORT = "high"
+CLAUDE_MODEL = "opus"
+CLAUDE_EFFORT = "low"
 CLAUDE_MAX_TURNS = 20
 CLAUDE_MAX_BUDGET_USD = 5.00
 CLAUDE_TIMEOUT_SEC = 1200

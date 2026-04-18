@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { type Pet, PET_ART, PET_ART_HAPPY, PET_INFO, PET_POKE_REACTIONS } from "@/lib/pet";
+import { type Pet, PET_INFO, PET_POKE_REACTIONS } from "@/lib/pet";
+import { PetSvg } from "./PetSvg";
 
 interface PetProps {
   pet: Pet;
@@ -13,7 +14,7 @@ export function PetCompanion({ pet, tip, mood = "idle" }: PetProps) {
   const [pokeReaction, setPokeReaction] = useState<string | null>(null);
 
   const handlePoke = useCallback(() => {
-    if (dancing) return; // don't stack animations
+    if (dancing) return;
     setDancing(true);
     const reactions = PET_POKE_REACTIONS[pet.species];
     setPokeReaction(reactions[Math.floor(Math.random() * reactions.length)]);
@@ -24,7 +25,6 @@ export function PetCompanion({ pet, tip, mood = "idle" }: PetProps) {
   }, [dancing, pet.species]);
 
   const showHappy = mood === "happy" || dancing;
-  const art = showHappy ? PET_ART_HAPPY[pet.species] : PET_ART[pet.species];
   const displayTip = pokeReaction ?? tip;
 
   return (
@@ -38,7 +38,7 @@ export function PetCompanion({ pet, tip, mood = "idle" }: PetProps) {
         </div>
       )}
 
-      {/* Pet — clickable */}
+      {/* Pet — clickable SVG */}
       <button
         type="button"
         onClick={handlePoke}
@@ -47,7 +47,7 @@ export function PetCompanion({ pet, tip, mood = "idle" }: PetProps) {
         }`}
         aria-label={`Poke ${info.displayName}`}
       >
-        <pre className="ascii text-foreground/85">{art}</pre>
+        <PetSvg species={pet.species} happy={showHappy} />
       </button>
 
       {/* Name plate */}

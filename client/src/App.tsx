@@ -9,7 +9,7 @@ import { Queue } from "./views/Queue";
 import { Upcoming } from "./views/Upcoming";
 import { Settings } from "./views/Settings";
 import { getSettings, getCredentials, getHeartbeatState, getAssignments } from "./lib/store";
-import { signIn, getStoredToken } from "./lib/auth";
+import { signIn, getStoredToken, hydrateTokensFromStore } from "./lib/auth";
 import { runHeartbeat, shouldRunHeartbeat, resetStaleRunningStatus } from "./lib/heartbeat";
 import { pollJobResults, uploadPendingJobs, reconcileWithServer } from "./lib/queue";
 import { Button } from "./components/ui/button";
@@ -69,6 +69,16 @@ function SignInScreen({ onSignIn }: { onSignIn: () => void }) {
 export default function App() {
   const [token, setToken] = useState<string | null>(getStoredToken());
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+
+  // Restore auth tokens from the durable file store if localStorage was
+  // cleared (WebKit cache wipe, app update, etc.). Runs once on mount.
+  useEffect(() => {
+    hydrateTokensFromStore().then(() => {
+      const restored = getStoredToken();
+      if (restored && !token) setToken(restored);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!token) return;

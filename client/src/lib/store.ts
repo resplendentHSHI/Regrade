@@ -65,6 +65,17 @@ interface Credentials { gsEmail: string; gsPassword: string; }
 export const getCredentials = () => readJson<Credentials>("credentials.json", { gsEmail: "", gsPassword: "" });
 export const saveCredentials = (c: Credentials) => writeJson("credentials.json", c);
 
+// ── Auth tokens (durable, survives WebKit localStorage clears) ───────────
+interface AuthTokens { accessToken: string; refreshToken?: string; }
+export const getAuthTokens = () => readJson<AuthTokens | null>("tokens.json", null);
+export const saveAuthTokens = (t: AuthTokens) => writeJson("tokens.json", t);
+export const clearAuthTokens = async () => {
+  try {
+    const { remove, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    await remove(`${STORE_DIR}/tokens.json`, { baseDir: BaseDirectory.AppData });
+  } catch { /* file may not exist */ }
+};
+
 // ── Pet companion ─────────────────────────────────────────────────────────
 export const getPet = () => readJson<Pet | null>("pet.json", null);
 export const savePet = (pet: Pet) => writeJson("pet.json", pet);
