@@ -4,6 +4,7 @@
  * Sized to fit the sidebar pet nest (~90px).
  */
 
+import type { ReactNode } from "react";
 import type { PetSpecies } from "@/lib/pet";
 
 interface PetSvgProps {
@@ -213,7 +214,7 @@ function Momo({ happy }: { happy?: boolean }) {
 
 /* ── Dispatcher ─────────────────────────────────────────────────────── */
 
-const PETS: Record<PetSpecies, (props: { happy?: boolean }) => JSX.Element> = {
+const PETS: Record<PetSpecies, (props: { happy?: boolean }) => ReactNode> = {
   bibi: Bibi,
   professor: Professor,
   pip: Pip,
