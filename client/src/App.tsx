@@ -10,7 +10,7 @@ import { Upcoming } from "./views/Upcoming";
 import { Settings } from "./views/Settings";
 import { getSettings, getCredentials, getHeartbeatState, getAssignments } from "./lib/store";
 import { signIn, getStoredToken } from "./lib/auth";
-import { runHeartbeat, shouldRunHeartbeat } from "./lib/heartbeat";
+import { runHeartbeat, shouldRunHeartbeat, resetStaleRunningStatus } from "./lib/heartbeat";
 import { pollJobResults, uploadPendingJobs, reconcileWithServer } from "./lib/queue";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -82,6 +82,12 @@ export default function App() {
     let reconcileInterval: ReturnType<typeof setInterval> | null = null;
 
     async function init() {
+      // Heal stale "running" heartbeat status from a crashed prior session
+      // before anything else reads it.
+      resetStaleRunningStatus().catch((err) =>
+        console.warn("Reset stale running status failed:", err)
+      );
+
       // Reconcile first — catches any state drift from previous session
       reconcileWithServer(token!).then((r) => {
         if (r.claimed || r.pulled || r.orphaned) {

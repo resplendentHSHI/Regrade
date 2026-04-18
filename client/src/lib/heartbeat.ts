@@ -19,7 +19,6 @@ export async function runHeartbeat(
     const enabledIds = courses.filter((c) => c.enabled).map((c) => c.id);
     if (enabledIds.length === 0) {
       state.status = "idle";
-      await store.saveHeartbeatState(state);
       return;
     }
 
@@ -87,10 +86,14 @@ export async function runHeartbeat(
     }
 
     const newCount = (result.items as any[]).length;
-    await store.addActivity(
-      `Heartbeat complete: ${newCount} new assignment(s) found`,
-      newCount > 0 ? "success" : "info",
-    );
+    try {
+      await store.addActivity(
+        `Heartbeat complete: ${newCount} new assignment(s) found`,
+        newCount > 0 ? "success" : "info",
+      );
+    } catch (err) {
+      console.warn("Activity log write failed:", err);
+    }
 
     state.lastRun = new Date().toISOString();
     state.status = "idle";
@@ -100,16 +103,47 @@ export async function runHeartbeat(
   } catch (err) {
     state.status = "error";
     console.error("Heartbeat error:", err);
-    await store.addActivity(`Heartbeat error: ${err}`, "warning");
-  }
+    try {
+      await store.addActivity(`Heartbeat error: ${err}`, "warning");
+    } catch (logErr) {
+      console.warn("Error activity log write failed:", logErr);
+    }
+  } finally {
+    // ALWAYS persist the terminal status — even if the try/catch bodies
+    // themselves threw. Without this, a crash mid-run leaves status="running"
+    // in storage, making the UI claim Poko is forever running.
+    if (state.status === "running") {
+      // Safety net: if we somehow exit the try without setting a terminal
+      // status, treat it as an error rather than lying to the UI.
+      state.status = "error";
+    }
 
-  // Schedule next for tomorrow 2 AM
-  const now = new Date();
-  const next = new Date(now);
-  next.setHours(2, 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  state.nextScheduled = next.toISOString();
-  await store.saveHeartbeatState(state);
+    // Schedule next for tomorrow 2 AM
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(2, 0, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    state.nextScheduled = next.toISOString();
+
+    try {
+      await store.saveHeartbeatState(state);
+    } catch (err) {
+      console.error("Failed to persist final heartbeat state:", err);
+    }
+  }
+}
+
+/**
+ * Recover from a crashed prior heartbeat. If storage claims the heartbeat is
+ * still "running" but nothing is actually in progress (this function is only
+ * called before any new run starts), reset it to idle so the UI doesn't lie.
+ */
+export async function resetStaleRunningStatus(): Promise<void> {
+  const state = await store.getHeartbeatState();
+  if (state.status === "running") {
+    state.status = "idle";
+    await store.saveHeartbeatState(state);
+  }
 }
 
 export function shouldRunHeartbeat(lastRun: string | null): boolean {
