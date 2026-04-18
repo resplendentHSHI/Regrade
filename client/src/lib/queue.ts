@@ -77,8 +77,8 @@ export async function reconcileWithServer(token: string): Promise<{
     // Case 4: sync status from server for in-flight items
     if (serverJob && !serverJob.has_result && item.jobId && item.jobId === serverJob.job_id) {
       // Server says still processing — make sure our status reflects that
-      if (item.status === "pending_upload" || item.status === "uploading") {
-        item.status = serverJob.status === "analyzing" ? "analyzing" : "uploading";
+      if (item.status === "pending_upload" || item.status === "uploading" || item.status === "queued") {
+        item.status = serverJob.status === "analyzing" ? "analyzing" : "queued";
       }
     }
   }
@@ -110,7 +110,7 @@ export async function uploadPendingJobs(token: string): Promise<number> {
         courseName: item.courseName || "",
       });
       item.jobId = result.job_id;
-      item.status = "uploading";
+      item.status = "queued";
       uploaded++;
       await store.addActivity(`Uploaded ${item.name} for analysis`, "info");
     } catch (err) {
@@ -157,7 +157,11 @@ export async function pollJobResults(token: string): Promise<number> {
         await api.deleteJob(token, item.jobId!);
         completed++;
       } else {
-        item.status = "analyzing";
+        // Mirror the server's actual status: "uploaded" means the job is
+        // queued waiting for a worker slot; "analyzing" means the Claude
+        // subprocess is actively running on it right now. Don't lie to the
+        // user by showing everything as "Analyzing".
+        item.status = status.status === "analyzing" ? "analyzing" : "queued";
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

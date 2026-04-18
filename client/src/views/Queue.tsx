@@ -44,11 +44,12 @@ type GradedItem = {
   type: string;
 };
 
-const ACTIVE_STATUSES = new Set(["pending_upload", "uploading", "analyzing"]);
+const ACTIVE_STATUSES = new Set(["pending_upload", "uploading", "queued", "analyzing"]);
 const COMPLETED_STATUSES = new Set(["no_issues", "regrade_candidates", "failed", "complete"]);
 
 function estimatedTime(status: string): string {
   if (status === "analyzing") return "~5-10 min";
+  if (status === "queued") return "waiting for slot";
   if (status === "uploading") return "< 1 min";
   if (status === "pending_upload") return "< 1 min";
   return "";
@@ -71,10 +72,18 @@ function ActiveIndicator({ status }: { status: string }) {
       </span>
     );
   }
+  if (status === "queued") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Clock className="h-3.5 w-3.5" />
+        In Queue
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Clock className="h-3.5 w-3.5" />
-      Pending
+      Pending Upload
     </span>
   );
 }

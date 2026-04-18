@@ -143,7 +143,7 @@ export default function App() {
           );
         }
         const hasInFlight = assignments.some(
-          (a) => a.jobId && (a.status === "uploading" || a.status === "analyzing")
+          (a) => a.jobId && (a.status === "uploading" || a.status === "queued" || a.status === "analyzing")
         );
         if (hasInFlight) {
           pollJobResults(token!).catch((err) =>

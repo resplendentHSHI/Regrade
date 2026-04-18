@@ -3,8 +3,9 @@ import { Badge } from "@/components/ui/badge";
 type Variant = "default" | "secondary" | "destructive" | "outline";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant }> = {
-  pending_upload: { label: "Pending", variant: "outline" },
+  pending_upload: { label: "Pending Upload", variant: "outline" },
   uploading: { label: "Uploading", variant: "secondary" },
+  queued: { label: "In Queue", variant: "secondary" },
   analyzing: { label: "Analyzing", variant: "secondary" },
   complete: { label: "Reviewed", variant: "default" },
   failed: { label: "Failed", variant: "destructive" },

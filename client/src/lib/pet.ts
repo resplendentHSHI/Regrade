@@ -97,6 +97,53 @@ export const PET_ART_HAPPY: Record<PetSpecies, string> = {
   \\_____/`,
 };
 
+/*
+ * Reactions when the user clicks / pokes the pet.
+ * Short, playful one-liners per species.
+ */
+export const PET_POKE_REACTIONS: Record<PetSpecies, string[]> = {
+  bibi: [
+    "hehe, that tickles!",
+    "i was reading!",
+    "boop!",
+    "oh hi!",
+    "worm dance!",
+    "again! again!",
+    "*wiggles happily*",
+    "you found me!",
+  ],
+  professor: [
+    "ahem!",
+    "yes, quite.",
+    "*adjusts spectacles*",
+    "i was mid-lecture!",
+    "fascinating.",
+    "hoo hoo!",
+    "*ruffles feathers*",
+    "knowledge is power.",
+  ],
+  pip: [
+    "hey!",
+    "...fine, i'll purr.",
+    "*reluctant dance*",
+    "i was napping.",
+    "not bad, human.",
+    "okay, ONE dance.",
+    "*stretches*",
+    "do that again.",
+  ],
+  momo: [
+    "wheee!",
+    "*ear flop*",
+    "bunny hop!",
+    "so fun!",
+    "*bounces*",
+    "hiii!",
+    "boing boing!",
+    "*happy wiggle*",
+  ],
+};
+
 export const PET_INFO: Record<PetSpecies, {
   displayName: string;
   species: string;

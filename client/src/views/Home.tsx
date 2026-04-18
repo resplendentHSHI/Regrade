@@ -60,7 +60,7 @@ export function Home({ token }: HomeProps) {
   async function loadQueueDepth() {
     const assignments = await getAssignments();
     const depth = assignments.filter((a: Assignment) =>
-      ["pending_upload", "uploading", "analyzing"].includes(a.status)
+      ["pending_upload", "uploading", "queued", "analyzing"].includes(a.status)
     ).length;
     setLiveQueueDepth(depth);
   }
